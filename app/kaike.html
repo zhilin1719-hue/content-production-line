@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>私域台 · 公开课</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  /* 页面级样式: 仅用 var(--xxx) 令牌 */
+  .sess-card { cursor: pointer; width: 100%; }
+  .sess-card:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 2px; }
+  .caps-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .pub-count { margin-left: auto; font: var(--caption); color: var(--muted); }
+  .pub-count b { font-family: var(--mono); color: var(--ink); font-size: 14px; }
+  .lane-btn { display: block; width: 100%; text-align: left; font: var(--caption); color: var(--ink); padding: 2px 4px; border-radius: 6px; min-height: 0; }
+  .lane-btn:hover { color: var(--accent-deep); }
+  .lane-btn.cur { color: var(--accent-deep); font-weight: 700; }
+  .f-row { margin-bottom: 14px; }
+  .f-label { display: block; font: var(--caption); color: var(--muted); margin-bottom: 6px; }
+  .f-in { width: 100%; border: 1.5px solid var(--rule); border-radius: var(--r-btn); padding: 9px 12px; font: var(--body); background: var(--surface); }
+  .f-in:focus { outline: none; border-color: var(--accent); }
+  .f-err { font: var(--caption); color: var(--danger); margin-top: 6px; }
+  .course-body { white-space: pre-wrap; font: var(--body); line-height: 1.9; background: var(--cream); border: 1px solid var(--rule); border-radius: var(--r-btn); padding: 16px; }
+  .cell-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div id="chrome"></div>
+
+<main class="wrap">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">私域台 · 公开课</h1>
+      <p class="page-sub">一场公开课就是一条生产线 —— 预热物料、正课正文、排期撞期，全在这屏上。 <span class="demo-tag">演示数据</span></p>
+    </div>
+    <span class="badge b-live">今日 · 2026-08-21</span>
+  </div>
+
+  <!-- 1) 场次卡区 -->
+  <section class="section" style="margin-top:0">
+    <div class="section-head">
+      <h2 class="section-title">在跑的场次</h2>
+      <span class="section-hint">每场都是「预热 3 天 + 正课 5 天」 · 多场并行 · 一屏看完</span>
+      <button class="btn" id="btnNewSess" style="margin-left:auto">新建场次</button>
+    </div>
+    <div id="sessZone"></div>
+  </section>
+
+  <!-- 2) 三渠道物料区 -->
+  <section class="section" id="matSection">
+    <div class="section-head">
+      <h2 class="section-title">预热物料 · 三渠道</h2>
+      <span class="section-hint" id="matHint"></span>
+    </div>
+    <div class="caps-row">
+      <div class="caps" id="dayCaps" role="group" aria-label="预热日切换"></div>
+      <span class="pub-count">本日已发 <b id="pubCount">0/3</b></span>
+    </div>
+    <div class="mat-grid" id="matGrid"></div>
+  </section>
+
+  <!-- 3) 正课区 -->
+  <section class="section">
+    <div class="section-head">
+      <h2 class="section-title">正课 · 5 天</h2>
+      <span class="section-hint">每天发一篇 · 每天一个主题 + 一份钩子文件 + 参考案例 · 配图 0/3</span>
+    </div>
+    <table class="tbl" id="courseTbl">
+      <thead><tr>
+        <th style="width:72px">第 N 天</th><th>主题</th><th style="width:250px">钩子文件 / 参考案例</th>
+        <th style="width:80px">状态</th><th style="width:130px">配图</th><th style="width:110px">操作</th>
+      </tr></thead>
+      <tbody id="courseBody"></tbody>
+    </table>
+  </section>
+
+  <!-- 4) 排期泳道区 -->
+  <section class="section">
+    <div class="section-head">
+      <h2 class="section-title">排期泳道 · 一屏看全月</h2>
+      <span class="section-hint" id="swimMonth"></span>
+    </div>
+    <div class="swim-wrap">
+      <table class="swim" id="swimTbl"></table>
+    </div>
+    <div class="swim-legend">
+      <span><i style="background:var(--warmup)"></i>预热期</span>
+      <span><i style="background:var(--live)"></i>正课期</span>
+      <span><i style="background:var(--warn)"></i>收官转化</span>
+      <span><i style="background:var(--info)"></i>其他场次</span>
+      <span class="muted" style="margin-left:auto">同项目同日两条朋友圈物料冲突时，此处给出提示</span>
+    </div>
+  </section>
+</main>
+
+<script src="assets/data.js"></script>
+<script src="assets/common.js"></script>
+<script>
+/* ================= 状态(持久化) ================= */
+const STATUS_BADGE = { '预热中': 'b-warmup', '正课中': 'b-live', '已收官': 'b-closed', '筹备中': 'b-muted' };
+const CH_ORDER = ['pyq', 'dm', 'poster'];
+const state = {
+  cur: CPL.store.get('kaike.cur', 's1'),
+  day: 'D1',
+};
+let matPub = CPL.store.get('kaike.matpub', {});      // key: 场次|日|渠道 -> true
+let matVar = CPL.store.get('kaike.matvar', {});      // key: 场次|日|渠道 -> 变体下标
+let courseSt = CPL.store.get('kaike.course', {});    // key: day -> {status, photos}
+let newSess = CPL.store.get('kaike.newSessions', []);
+
+const allSessions = () => CPL_DATA.sessions.concat(newSess);
+const curSession = () => allSessions().find(s => s.id === state.cur) || allSessions()[0];
+const mkey = (ch) => `${state.cur}|${state.day}|${ch}`;
+const pad2 = (n) => String(n).padStart(2, '0');
+const md = (iso) => { const d = new Date(iso + 'T00:00:00'); return pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); };
+const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const shortName = (t) => t.split(/[，,：:]/)[0].replace(/\s/g, '');
+
+/* 正课进度联动: 已发 n/5 回写「正课中」场次的进度文案 */
+const courseDay = (d) => {
+  const base = CPL_DATA.course.find(c => c.day === d);
+  const ov = courseSt[d] || {};
+  return { ...base, status: ov.status || base.status, photos: ov.photos != null ? ov.photos : base.photos };
+};
+const coursePubCount = () => CPL_DATA.course.filter(c => courseDay(c.day).status === '已发').length;
+const sessProgress = (s) => s.status === '正课中' ? `已发 ${coursePubCount()}/5` : s.progress;
+
+/* ================= 1) 场次卡区 ================= */
+function renderSessions() {
+  const zone = CPL.$('#sessZone');
+  const list = allSessions();
+  if (!list.length) {
+    zone.innerHTML = `<div class="card empty">
+      <div class="empty-glyph">课</div>
+      <div class="empty-text">新建第一场公开课：预热 3 天 + 正课 5 天，物料系统全包</div>
+      <button class="btn" id="emptyNew">新建场次</button>
+    </div>`;
+    CPL.$('#emptyNew').onclick = openNewSessModal;
+    return;
+  }
+  zone.innerHTML = `<div class="sess-row">` + list.map(s => `
+    <button class="card sess-card ${s.id === state.cur ? 'current' : ''}" data-sid="${s.id}" aria-pressed="${s.id === state.cur}">
+      ${s.id === state.cur && s.today ? `<span class="today-flag">今日 ${s.today}</span>` : ''}
+      <span class="sess-title">${CPL.esc(s.title)}</span>
+      <span class="sess-meta">${CPL.esc(s.host)} · 预热 ${md(s.warmStart)} · 开课 ${md(s.openDay)}</span>
+      <span class="sess-foot">
+        <span class="badge ${STATUS_BADGE[s.status] || 'b-muted'}">${s.status}</span>
+        <span class="mono" style="font:var(--caption);color:var(--muted);margin-left:auto">${CPL.esc(sessProgress(s))}</span>
+      </span>
+    </button>`).join('') + `</div>`;
+  CPL.$$('.sess-card', zone).forEach(c => c.onclick = () => {
+    if (state.cur === c.dataset.sid) return;
+    state.cur = c.dataset.sid;
+    CPL.store.set('kaike.cur', state.cur);
+    renderSessions(); renderMats(); renderSwim();
+  });
+}
+
+/* ================= 2) 三渠道物料区 ================= */
+function renderMats() {
+  const s = curSession();
+  CPL.$('#matHint').textContent = s ? `当前场次：${shortName(s.title)} · 预热 ${md(s.warmStart)} 起 · 换一换会记入学习信号` : '';
+  CPL.$('#dayCaps').innerHTML = ['D1', 'D2', 'D3'].map(d =>
+    `<button class="cap ${d === state.day ? 'on' : ''}" data-day="${d}" aria-pressed="${d === state.day}">${d}</button>`).join('');
+  CPL.$$('#dayCaps .cap').forEach(b => b.onclick = () => { state.day = b.dataset.day; renderMats(); });
+
+  const dayMat = CPL_DATA.materials[state.day];
+  const pubCount = CH_ORDER.filter(ch => matPub[mkey(ch)]).length;
+  CPL.$('#pubCount').textContent = `${pubCount}/3`;
+
+  CPL.$('#matGrid').innerHTML = CH_ORDER.map(ch => {
+    const m = dayMat[ch];
+    const vi = (matVar[mkey(ch)] || 0) % m.variants.length;
+    const v = m.variants[vi];
+    const pub = !!matPub[mkey(ch)];
+    let body;
+    if (ch === 'poster') {
+      body = `<div class="mat-poster"><h4>${CPL.esc(v.title)}</h4>
+        <div class="p-sub">${CPL.esc(v.sub)}</div>
+        <div class="p-proof">${CPL.esc(v.proof)}</div>
+        <div class="p-cta">${CPL.esc(v.cta)}</div></div>`;
+    } else {
+      body = CPL.esc(v);
+    }
+    return `<div class="card mat-card" data-ch="${ch}">
+      <div class="mat-head">
+        <span class="mat-channel">${m.name}</span>
+        ${pub ? '<span class="badge b-pub">已发 ✓</span>' : ''}
+        <span class="mat-variants">变体 ${vi + 1}/${m.variants.length}</span>
+      </div>
+      <div class="mat-body">${body}</div>
+      <div class="mat-foot">
+        <button class="btn btn-ghost btn-sm" data-act="swap">换一换</button>
+        ${ch === 'poster'
+          ? '<button class="btn btn-ghost btn-sm" data-act="png">下载 PNG</button>'
+          : '<button class="btn btn-ghost btn-sm" data-act="copy">复制</button>'}
+        <button class="btn btn-sm" data-act="pub" ${pub ? 'disabled' : ''}>${pub ? '已发 ✓' : '标已发'}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  CPL.$$('#matGrid .mat-card').forEach(card => {
+    const ch = card.dataset.ch;
+    const m = dayMat[ch];
+    const vi = (matVar[mkey(ch)] || 0) % m.variants.length;
+    const v = m.variants[vi];
+    card.querySelector('[data-act="swap"]').onclick = () => {
+      matVar[mkey(ch)] = (vi + 1) % m.variants.length;
+      CPL.store.set('kaike.matvar', matVar);
+      renderMats();
+      CPL.toast('换过已记入学习信号 —— 下一版更贴你挑中的那条');
+    };
+    const cpBtn = card.querySelector('[data-act="copy"]');
+    if (cpBtn) cpBtn.onclick = () => CPL.copyText(v, cpBtn);
+    const pngBtn = card.querySelector('[data-act="png"]');
+    if (pngBtn) pngBtn.onclick = () => downloadPoster(v, curSession());
+    const pubBtn = card.querySelector('[data-act="pub"]');
+    pubBtn.onclick = () => {
+      if (matPub[mkey(ch)]) return;
+      const n = CH_ORDER.filter(c => matPub[mkey(c)]).length;
+      matPub[mkey(ch)] = true;
+      CPL.store.set('kaike.matpub', matPub);
+      CPL.markPublished(pubBtn, `已发 ${n}/3 → ${n + 1}/3 —— ${m.name}已记入发布记账`);
+      renderMats();
+    };
+  });
+}
+
+/* 海报 PNG: canvas 1080×1440 真实绘制 */
+function downloadPoster(v, s) {
+  try {
+    const W = 1080, H = 1440;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, W * 0.4, H);
+    g.addColorStop(0, '#2E2A24'); g.addColorStop(1, '#4A3F32');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const M = 88, maxW = W - M * 2;
+
+    /* 大标题(奶油色, 自动换行) */
+    ctx.fillStyle = '#F5F0E8';
+    ctx.font = '800 92px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textBaseline = 'top';
+    let y = 300;
+    let line = '';
+    for (const ch of v.title) {
+      if (ctx.measureText(line + ch).width > maxW && line) {
+        ctx.fillText(line, M, y); y += 128; line = ch;
+      } else line += ch;
+    }
+    if (line) { ctx.fillText(line, M, y); y += 128; }
+
+    /* 副标题 */
+    y += 40;
+    ctx.fillStyle = '#D8CFC0';
+    ctx.font = '400 42px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText(v.sub, M, y);
+
+    /* 数据背书(橙) */
+    y += 110;
+    ctx.fillStyle = '#E0A13A';
+    ctx.font = '700 46px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText(v.proof, M, y);
+
+    /* 底部主橙圆角 CTA 条 */
+    const ctaH = 108, ctaY = H - 220, r = 54;
+    ctx.fillStyle = '#E06A3A';
+    ctx.beginPath();
+    ctx.moveTo(M + r, ctaY);
+    ctx.arcTo(M + maxW, ctaY, M + maxW, ctaY + ctaH, r);
+    ctx.arcTo(M + maxW, ctaY + ctaH, M, ctaY + ctaH, r);
+    ctx.arcTo(M, ctaY + ctaH, M, ctaY, r);
+    ctx.arcTo(M, ctaY, M + maxW, ctaY, r);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '700 44px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(v.cta, W / 2, ctaY + 32);
+    ctx.textAlign = 'left';
+
+    cv.toBlob((blob) => {
+      if (!blob) { CPL.toast('PNG 生成失败 —— 请重试：先「换一换」再下载', false); return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `海报-${shortName(s.title)}-${state.day}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      CPL.toast('海报 PNG 已下载 —— 发完记得回来「标已发」');
+    }, 'image/png');
+  } catch (e) {
+    CPL.toast('PNG 生成失败 —— 请重试：先「换一换」再下载', false);
+  }
+}
+
+/* ================= 3) 正课区 ================= */
+function renderCourse() {
+  CPL.$('#courseBody').innerHTML = CPL_DATA.course.map(c => {
+    const d = courseDay(c.day);
+    const pub = d.status === '已发';
+    return `<tr>
+      <td class="mono">D${c.day}</td>
+      <td>${CPL.esc(c.theme)}</td>
+      <td><div class="cell-badges">
+        <span class="badge b-warmup">${CPL.esc(c.hook)}</span>
+        ${c.caseRef ? `<span class="badge b-info">${CPL.esc(c.caseRef)}</span>` : '<span class="muted">—</span>'}
+      </div></td>
+      <td><span class="badge ${pub ? 'b-pub' : 'b-unpub'}">${d.status}</span></td>
+      <td><span class="mono" style="font:var(--caption)">${d.photos}/3</span>
+        <button class="btn btn-ghost btn-sm" data-photo="${c.day}" ${d.photos >= 3 ? 'disabled' : ''} style="margin-left:6px">上传</button></td>
+      <td>${pub ? '<span class="muted" style="font:var(--caption)">已归档</span>' : `<button class="btn btn-sm" data-gen="${c.day}">生成正文</button>`}</td>
+    </tr>`;
+  }).join('');
+
+  CPL.$$('[data-photo]').forEach(b => b.onclick = () => {
+    const d = +b.dataset.photo;
+    const cur = courseDay(d);
+    if (cur.photos >= 3) return;
+    courseSt[d] = { status: cur.status, photos: cur.photos + 1 };
+    CPL.store.set('kaike.course', courseSt);
+    renderCourse();
+    CPL.toast(`配图 ${cur.photos}/3 → ${cur.photos + 1}/3 —— 已挂到 D${d} 正文`);
+  });
+
+  CPL.$$('[data-gen]').forEach(b => b.onclick = () => {
+    const d = +b.dataset.gen;
+    CPL.withLoading(b, '生成中…', (done) => {
+      setTimeout(() => { done(); openCourseModal(d); }, 2000);
+    });
+  });
+}
+
+function openCourseModal(day) {
+  const c = CPL_DATA.course.find(x => x.day === day);
+  const n = coursePubCount();
+  const text = `【公开课 D${day} 正文 · 演示稿】\n\n${c.theme}\n\n开场先把问题钉死：你不是不努力，是努力的方向上没有系统。今天这一天，只解决一件事——把「${c.hook}」里的动作，落到你自己的业务上。\n\n三步走：\n一、对照昨天的内容，找出你卡住的那一环；\n二、用今天的框架把它拆开，每一步都有可核验的数字；\n三、今晚 8 点前在群里交作业，明早我逐条批。\n\n听完了别只点头，动手才算数。钩子文件群里自取。`;
+  const m = CPL.openModal(`
+    <div class="modal-head">
+      <div><div class="modal-title">D${day} 正文已生成</div>
+      <div class="modal-sub">${CPL.esc(c.hook)} · 发完标已发，进度即时回写</div></div>
+      <button class="modal-x" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body"><div class="course-body">${CPL.esc(text)}</div></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="cpBody">复制正文</button>
+      <button class="btn" id="pubBody">标已发</button>
+    </div>`);
+  m.el.querySelector('#cpBody').onclick = (e) => CPL.copyText(text, e.target);
+  m.el.querySelector('#pubBody').onclick = () => {
+    courseSt[day] = { status: '已发', photos: courseDay(day).photos };
+    CPL.store.set('kaike.course', courseSt);
+    m.close();
+    renderCourse(); renderSessions();
+    const now = coursePubCount();
+    CPL.toast(`正课已发 ${n}/5 → ${now}/5 —— D${day} 已归档`);
+    if (now === 5) setTimeout(() => CPL.toast('正课全部发出，可执行收官动作'), 700);
+  };
+}
+
+/* ================= 4) 排期泳道区 ================= */
+const LANE_SESS = ['s1', 's3', 's2', 's4'];
+function renderSwim() {
+  const sw = CPL_DATA.swim;
+  CPL.$('#swimMonth').textContent = `${sw.month} · 今日 ${sw.today} 日 · 点行标签切换当前场次`;
+  let html = `<thead><tr><th class="row-label">场次</th>`;
+  for (let d = 1; d <= 31; d++) html += `<th>${d}</th>`;
+  html += `</tr></thead><tbody>`;
+  sw.lanes.forEach((ln, i) => {
+    const sid = LANE_SESS[i];
+    const cur = sid && sid === state.cur;
+    html += `<tr><td class="row-label"><button class="lane-btn ${cur ? 'cur' : ''}" data-lane="${i}" ${sid ? '' : 'disabled'}>${CPL.esc(ln.name)}</button></td>`;
+    for (let d = 1; d <= 31; d++) {
+      const bars = ln.bars.filter(([a, b]) => d >= a && d <= b)
+        .map(([a, b, ph]) => `<span class="bar ${ph}${d === a ? ' start' : ''}${d === b ? ' end' : ''}"></span>`).join('');
+      html += `<td class="day${d === sw.today ? ' today' : ''}">${bars}</td>`;
+    }
+    html += `</tr>`;
+  });
+  html += `</tbody>`;
+  CPL.$('#swimTbl').innerHTML = html;
+  CPL.$$('.lane-btn').forEach(b => b.onclick = () => {
+    const sid = LANE_SESS[+b.dataset.lane];
+    if (!sid || !allSessions().some(s => s.id === sid)) return;
+    state.cur = sid;
+    CPL.store.set('kaike.cur', state.cur);
+    renderSessions(); renderMats(); renderSwim();
+  });
+}
+
+/* ================= 5) 新建场次弹层 ================= */
+function openNewSessModal() {
+  const m = CPL.openModal(`
+    <div class="modal-head">
+      <div><div class="modal-title">新建场次</div>
+      <div class="modal-sub">预热开始日 +3 天开课 · 正课期与在跑场次撞期会被拦下</div></div>
+      <button class="modal-x" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="f-row"><label class="f-label" for="fTitle">课程主题（≤40 字 · 格式：痛点人群 + 结果承诺）</label>
+        <input class="f-in" id="fTitle" maxlength="40" placeholder="有流量却卡在变现：博主突破千万的私域成交系统课"></div>
+      <div class="f-row"><label class="f-label" for="fAud">目标人群（≤30 字）</label>
+        <input class="f-in" id="fAud" maxlength="30" placeholder="百万粉丝、月入不过万的博主"></div>
+      <div class="f-row"><label class="f-label" for="fHook">主钩子</label>
+        <select class="f-in" id="fHook">${CPL_DATA.hooks.map(h => `<option>${CPL.esc(h)}</option>`).join('')}</select></div>
+      <div class="f-row"><label class="f-label" for="fDate">预热开始日</label>
+        <input class="f-in" id="fDate" type="date" value="2026-08-21"></div>
+      <div class="f-err" id="fErr" role="alert" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost modal-x">再想想</button>
+      <button class="btn" id="fSubmit">建场次</button>
+    </div>`);
+
+  m.el.querySelector('#fSubmit').onclick = () => {
+    const title = m.el.querySelector('#fTitle').value.trim();
+    const aud = m.el.querySelector('#fAud').value.trim();
+    const warm = m.el.querySelector('#fDate').value;
+    const err = m.el.querySelector('#fErr');
+    const fail = (msg) => { err.textContent = msg; err.style.display = 'block'; };
+    err.style.display = 'none';
+    if (!title) return fail('课程主题必填 —— 没有主题，物料系统没法开工');
+    if (title.length > 40) return fail('课程主题超 40 字，收一收');
+    if (aud.length > 30) return fail('目标人群超 30 字，收一收');
+    if (!warm) return fail('先定预热开始日 —— 开课日 = 预热开始日 + 3 天');
+    const open = addDays(warm, 3), end = addDays(warm, 7);
+    const clash = allSessions().find(s => {
+      const a = new Date(s.openDay + 'T00:00:00'), b = new Date(addDays(s.openDay, 4) + 'T00:00:00');
+      return new Date(open + 'T00:00:00') <= b && new Date(end + 'T00:00:00') >= a;
+    });
+    if (clash) return fail(`与『${shortName(clash.title)}』正课期 ${md(clash.openDay)}~${md(addDays(clash.openDay, 4))} 撞期 —— 把预热开始日挪开再建`);
+    const s = {
+      id: 'sn' + Date.now(), title, host: '泽宇', audience: aud,
+      warmStart: warm, openDay: open, status: '筹备中', progress: '筹备中',
+    };
+    newSess.push(s);
+    CPL.store.set('kaike.newSessions', newSess);
+    state.cur = s.id;
+    CPL.store.set('kaike.cur', state.cur);
+    m.close();
+    renderSessions(); renderMats(); renderSwim();
+    CPL.toast('场次已建 · 物料将于预热日早 8 点前就绪');
+  };
+  m.el.querySelector('#fTitle').focus();
+}
+
+CPL.$('#btnNewSess').onclick = openNewSessModal;
+
+/* ================= 启动 ================= */
+CPL.renderChrome('kaike');
+renderSessions();
+renderMats();
+renderCourse();
+renderSwim();
+</script>
+</body>
+</html>

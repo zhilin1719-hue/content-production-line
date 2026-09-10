@@ -1,0 +1,82 @@
+[
+ {
+  "id": "s1",
+  "projectId": "p-zeyu",
+  "title": "有流量, 却卡在变现: 博主突破千万的私域成交系统课",
+  "host": "泽宇",
+  "audience": "百万粉丝、月入不过万的博主",
+  "hook": "《高净值变现路线图》",
+  "warmStart": "2026-08-21",
+  "openDay": "2026-08-24",
+  "endDay": "2026-08-28",
+  "status": "预热中",
+  "today": "D1",
+  "progress": "预热 1/3"
+ },
+ {
+  "id": "s2",
+  "projectId": "p-zeyu",
+  "title": "从百万到千万: 高净值变现的三把钥匙",
+  "host": "泽宇",
+  "audience": "卡在百万的成熟博主",
+  "hook": "《报价 10 倍手册》",
+  "warmStart": "2026-08-03",
+  "openDay": "2026-08-06",
+  "endDay": "2026-08-10",
+  "status": "已收官",
+  "progress": "已收官"
+ },
+ {
+  "id": "s3",
+  "projectId": "p-zeyu",
+  "title": "疗愈行业高客单变现: 定位收窄实战",
+  "host": "泽宇",
+  "audience": "疗愈赛道从业者",
+  "hook": "《顾问式成交手册》",
+  "warmStart": "2026-08-18",
+  "openDay": "2026-08-21",
+  "endDay": "2026-08-25",
+  "status": "正课中",
+  "progress": "已发 4/5"
+ },
+ {
+  "id": "s4",
+  "projectId": "p-zeyu",
+  "title": "小团队做千万: 业务自运转系统",
+  "host": "泽宇",
+  "audience": "3-10 人小团队一把手",
+  "hook": "《进化一把手》",
+  "warmStart": "2026-08-28",
+  "openDay": "2026-08-31",
+  "endDay": "2026-09-04",
+  "status": "筹备中",
+  "progress": "筹备中"
+ },
+ {
+  "id": "sc1",
+  "projectId": "p-cenqc",
+  "title": "别墅设计高客单: 全案交付系统课",
+  "host": "岑晴川",
+  "audience": "想接全案的设计师",
+  "hook": "《别墅全案交付路线图》",
+  "warmStart": "2026-09-07",
+  "openDay": "2026-09-10",
+  "endDay": "2026-09-14",
+  "status": "预热中",
+  "today": "D1",
+  "progress": "预热 1/3"
+ },
+ {
+  "id": "sc2",
+  "projectId": "p-cenqc",
+  "title": "从散单到全案: 设计师定位收窄课",
+  "host": "岑晴川",
+  "audience": "被散单拖住的设计师",
+  "hook": "《全案设计交付手册》",
+  "warmStart": "2026-08-10",
+  "openDay": "2026-08-13",
+  "endDay": "2026-08-17",
+  "status": "已收官",
+  "progress": "已收官"
+ }
+]

@@ -1,0 +1,71 @@
+{
+  "evalSetVersion": "v1.0",
+  "engine": "server/engines.js",
+  "date": "2026-09-10",
+  "total": 250,
+  "byKind": {
+    "voice": 60,
+    "compliance": 60,
+    "originality": 60,
+    "semantic": 30,
+    "boundary": 40
+  },
+  "metrics": {
+    "likeness": {
+      "positiveCount": 45,
+      "positiveMean": 98,
+      "gatePass": 45,
+      "gateRate": 1,
+      "negativeCount": 15,
+      "negativeCorrect": 15,
+      "negativeRate": 1,
+      "target": "单条≥90, 均值≥93",
+      "passMean": true,
+      "passGate": true
+    },
+    "intercept": {
+      "mustIntercept": 40,
+      "intercepted": 40,
+      "interceptRate": 1,
+      "variantCount": 15,
+      "variantIntercepted": 15,
+      "variantRate": 1,
+      "cleanCount": 20,
+      "cleanFalseHits": 0,
+      "falseHitRate": 0,
+      "missedIds": [],
+      "falseHitIds": [],
+      "target": "拦截率 100% (NFR-18), 干净样本零误拦",
+      "pass": true
+    },
+    "semantic": {
+      "count": 30,
+      "caught": 30,
+      "catchRate": 1,
+      "missRate": 0,
+      "missedIds": [],
+      "target": "漏检率 ≤ 1% (NFR-18, 裁判词表口径)",
+      "pass": true
+    },
+    "originality": {
+      "count": 60,
+      "agreed": 60,
+      "agreementRate": 1,
+      "disagree": [],
+      "thresholdPct": 15,
+      "target": "判定一致率 100% (重合率 ≤15% 通过)",
+      "pass": true
+    },
+    "boundary": {
+      "count": 40,
+      "noCrash": 40,
+      "deterministic": 40,
+      "crashed": [],
+      "target": "极端输入不崩溃且输出确定",
+      "pass": true
+    }
+  },
+  "fails": [],
+  "overallPass": true,
+  "failCount": 0
+}

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交付门户 · 流量总台 · 内容生产线</title>
+<link rel="stylesheet" href="app/assets/tokens.css">
+<link rel="stylesheet" href="app/assets/app.css">
+<style>
+  .d-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .d-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .d-card h3 { font: var(--t3); display: flex; align-items: center; gap: 8px; }
+  .d-card ul { list-style: none; font: var(--caption); color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  .d-card li a { color: var(--accent-deep); }
+  .trace td { font-size: 13px; }
+  .ok-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 6px; }
+  code.api { font-family: var(--mono); font-size: 12px; background: var(--cream); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+  .metric { display: flex; align-items: baseline; gap: 8px; }
+  .metric b { font: 800 22px/1 var(--mono); color: var(--success); }
+  @media (max-width: 1279px) { .d-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 899px) { .d-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in">
+  <span class="brand"><span class="brand-dot">总</span><span>流量总台 · 内容生产线 · 交付门户</span></span>
+  <span class="demo-tag">交付包 V1.0 · 2026-09-10</span>
+  <div class="topbar-right"><span class="role-badge">双方验收入口</span></div>
+</div></header>
+
+<main class="wrap">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">交付门户</h1>
+      <p class="page-sub">按《附件二 · 交付物清单》D1–D8 逐项交付。点任何卡片进入对应交付物。</p>
+    </div>
+    <a class="btn" href="app/index.html">打开可交互原型 →</a>
+  </div>
+
+  <!-- 交付物 D1-D8 -->
+  <section class="section" style="margin-top:0">
+    <div class="section-head"><h2 class="section-title">交付物清单（对应合同附件二）</h2><span class="section-hint">D1–D8 · 全部就绪</span></div>
+    <div class="d-grid">
+      <div class="card d-card">
+        <h3><span class="ok-dot"></span>D1 开发文档与门户</h3>
+        <ul>
+          <li>本门户（HTML 版，含图表与追溯矩阵）</li>
+          <li>需求基线：附件一~四（PDF 原件）</li>
+          <li><a href="app/index.html">可交互原型 ×4（公域/朋友圈/公开课/总台）</a></li>
+        </ul>
+      </div>
+      <div class="card d-card">
+        <h3><span class="ok-dot"></span>D2 源码与测试</h3>
+        <ul>
+          <li>后端源码 <code class="api">server/</code>（零依赖 Node，单机 Compose）</li>
+          <li>测试套件：73 用例全绿 + 集成冒烟 28/28</li>
+          <li><a href="server/test/report.txt">测试报告</a> · <a href="server/test/smoke-report.txt">集成冒烟报告</a> · <a href="README.md">README</a></li>
+        </ul>
+      </div>
+      <div class="card d-card">
+        <h3><span class="ok-dot"></span>D3 API 契约</h3>
+        <ul>
+          <li>OpenAPI 3.1 · 33 端点全量</li>
+          <li><a href="docs/api/openapi.yaml">openapi.yaml</a></li>
+        </ul>
+      </div>
+      <div class="card d-card">
+        <h3><span class="ok-dot"></span>D4 提示词模板</h3>
+        <ul>
+          <li>P-01 ~ P-08 全集（版本化随代码库）</li>
+          <li><a href="docs/prompts/P-01-理念选题三选一.md">P-01 理念三选一</a> … <a href="docs/prompts/P-08-案例结构化.md">P-08 案例结构化</a></li>
+        </ul>
+      </div>
+      <div class="card d-card">
+        <h3><span class="ok-dot"></span>D5 评测集与基线</h3>
+        <ul>
+          <li>静态评测集 250 条（确定性可复现）</li>
+          <li><a href="server/eval/eval-report.md">首轮基线报告：五指标全部达标</a></li>
+          <li><a href="server/eval/judge-config.yaml">裁判模型配置</a></li>
+        </ul>
+      </div>
+      <div class="card d-card">
+        <h3><span class="ok-dot"></span>D6 培训三件套</h3>
+        <ul>
+          <li><a href="docs/training/操作手册.md">操作手册</a>（按三模块任务式编排）</li>
+          <li><a href="docs/training/FAQ-知识库.md">FAQ 知识库</a>（36 条）</li>
+          <li><a href="docs/training/录屏清单.md">录屏清单</a>（15 段拍摄脚本）</li>
+        </ul>
+      </div>
+      <div class="card d-card">
+        <h3><span class="ok-dot"></span>D7 运维与应急包</h3>
+        <ul>
+          <li><a href="docs/ops/运维手册.md">运维手册</a> · <a href="docs/ops/发布与回滚-runbook.md">发布/回滚 runbook</a></li>
+          <li><a href="docs/ops/备份恢复手册.md">备份恢复手册</a> · <a href="docs/ops/告警处置单.md">告警处置单</a>（7 卡）</li>
+        </ul>
+      </div>
+      <div class="card d-card">
+        <h3><span class="ok-dot"></span>D8 验收与过程档案</h3>
+        <ul>
+          <li>里程碑纪要 ×4 · UAT 签字单 ×4</li>
+          <li><a href="docs/acceptance/考核认证表.md">考核认证表</a> · <a href="docs/acceptance/项目验收单.md">项目验收单</a></li>
+          <li><a href="docs/acceptance/服务期启动确认书.md">服务期启动确认书</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 质量证据 -->
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">验收基线三证据</h2><span class="section-hint">对应《附件三》验收口径</span></div>
+    <div class="stat-grid">
+      <div class="card stat-card"><div class="stat-label">功能测试</div><div class="metric"><b>73/73</b><span class="kv">用例全绿</span></div><div class="kv">引擎/状态机/隔离/API/LLM 网关</div></div>
+      <div class="card stat-card"><div class="stat-label">像你度均值</div><div class="metric"><b>98</b><span class="kv">≥ 93 达标</span></div><div class="kv">单条门禁 45/45 · 负样本拦截 15/15</div></div>
+      <div class="card stat-card"><div class="stat-label">合规拦截率</div><div class="metric"><b>100%</b><span class="kv">含变体干扰</span></div><div class="kv">干净样本零误拦 · 语义漏检 0%</div></div>
+      <div class="card stat-card"><div class="stat-label">原创度门禁</div><div class="metric"><b>100%</b><span class="kv">判定一致率</span></div><div class="kv">连续 8 字重合 ≤ 15%（D-3 默认值）</div></div>
+    </div>
+  </section>
+
+  <!-- 需求追溯矩阵 -->
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">需求追溯矩阵 · 29 项 FR</h2><span class="section-hint">P0 一期交付 · P1 二期 · P2 视排期（对应附件一 §5）</span></div>
+    <table class="tbl trace">
+      <thead><tr><th style="width:76px">编号</th><th>需求</th><th style="width:120px">优先级</th><th style="width:150px">原型位置</th><th>API / 引擎</th></tr></thead>
+      <tbody id="traceBody"></tbody>
+    </table>
+    <p class="section-hint mt8">P1 项在原型中已具备交互形态与数据契约，二期内补齐深度（如 FR-B5 偏好周更、FR-C6 钩子包独立管理页）；证据详见测试报告与评测报告。</p>
+  </section>
+
+  <!-- 快速开始 -->
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">快速开始</h2><span class="section-hint">两种方式</span></div>
+    <div class="grid-2">
+      <div class="card card-pad">
+        <h3 style="font:var(--t3)">方式一 · 直接打开原型（评审用）</h3>
+        <p class="mt8" style="font:var(--body);line-height:1.8">双击 <code class="api">app/index.html</code> 即可，零依赖、离线可用；所有状态本地持久化（演示数据已标注）。</p>
+      </div>
+      <div class="card card-pad">
+        <h3 style="font:var(--t3)">方式二 · 启动后端服务（联调用）</h3>
+        <p class="mt8" style="font:var(--body);line-height:1.8">Node ≥ 18：<code class="api">node server/seed.js --reset</code> → <code class="api">node server/server.js</code> → 打开 <code class="api">http://localhost:8399</code>（同端口托管原型与 33 个 API）。Docker：<code class="api">docker compose up -d</code>。</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const FR = [
+  ['FR-A1','对标账号管理（脱敏展示/开盯暂停）','P0','公域台 · 账号卡区','GET/POST/PATCH /api/accounts'],
+  ['FR-A2','对标内容扫描入库（三因子过滤）','P0','公域台 · 扫描汇总条','POST /api/accounts/:id/scan'],
+  ['FR-A3','选题池管理（对照表/筛选/淘汰恢复）','P0','公域台 · 选题池对照表','GET /api/topics · discard/restore'],
+  ['FR-A4','理念选题三选一（可重新生成）','P0','出稿工作台 · 步骤 1','POST /api/topics/:id/ideas + P-01'],
+  ['FR-A5','框架二选一','P0','出稿工作台 · 步骤 2','POST /api/topics/:id/frame + P-02'],
+  ['FR-A6','口播初稿生成（局部重写/追溯链）','P0','出稿工作台 · 步骤 3','POST /api/topics/:id/draft + P-03'],
+  ['FR-A7','合规三层审查（规则→复核→人工终审）','P0','出稿工作台 · 步骤 4','compliance/apply-fixes/review/final-review + P-07'],
+  ['FR-A8','出稿归档与发布衔接（复制/导出）','P1','过审归档卡','GET /api/drafts/:id/export'],
+  ['FR-B1','五源数据连接（状态展示）','P0','朋友圈 · 引擎与数据源区','GET /api/sources'],
+  ['FR-B2','连库扫描边扫边学（结构化入池）','P0','朋友圈 · 今日新增素材','种子任务 + 素材状态机'],
+  ['FR-B3','声纹引擎（像你度 ≥90 出稿）','P0','朋友圈 · 声纹徽章','engines.likeness + NFR-17 门禁'],
+  ['FR-B4','六池管理（水位/配比取材）','P0','朋友圈 · 六池水位卡','GET /api/pools + 配比策略'],
+  ['FR-B5','习惯自适应（行为信号学习）','P1','朋友圈 · 学习信号计数','swap/publish 学习事件'],
+  ['FR-B6','朋友圈内容生成（换一换/金句/配图）','P0','朋友圈 · 随取随发','POST /api/moments/generate + P-04'],
+  ['FR-B7','发布记账（水位回写/已发历史）','P0','朋友圈 · 标已发联动','POST /api/moments/:id/publish（幂等 409）'],
+  ['FR-B8','生活素材库管理（#编号/授权标记）','P1','朋友圈 · 配图推荐 chips','素材授权字段（FR-D4 联动）'],
+  ['FR-C1','场次管理（预热3+正课5/多场并行）','P0','公开课 · 场次卡区','GET/POST /api/sessions + 节奏引擎'],
+  ['FR-C2','三渠道物料生成（按天分页）','P0','公开课 · 三渠道物料','materials 生成 + P-04/P-05/P-08'],
+  ['FR-C3','变体与换一换（历史可回退）','P0','物料卡 · 换一换','POST .../materials/:day/:channel/swap'],
+  ['FR-C4','复制/下载/标已发（进度联动）','P0','物料卡操作组','publish + canvas PNG 下载'],
+  ['FR-C5','正课大纲与正文（配图 0/3）','P0','公开课 · 正课表','course/:day/generate + P-06'],
+  ['FR-C6','钩子资料包管理','P1','场次/正课钩子字段','hooks 关联（二期独立管理页）'],
+  ['FR-C7','排期泳道日历（一屏看全月）','P1','公开课 · 泳道甘特','月历渲染 + 撞期提示'],
+  ['FR-C8','海报生成（模板+AI 双轨/降级）','P1','物料卡 · 海报预览','canvas 1080×1440 + 模板降级轨'],
+  ['FR-D1','账号与角色权限（四角色矩阵）','P0','顶栏角色徽章','auth + 403 权限测试'],
+  ['FR-D2','多客户项目管理（配置隔离）','P0','顶栏项目切换','跨项目一律 404（隔离测试）'],
+  ['FR-D3','操作审计日志','P1','—','GET /api/audit（操作者/时间/动作）'],
+  ['FR-D4','素材授权与脱敏','P1','账号脱敏/授权徽章','授权状态字段 + 展示脱敏'],
+  ['FR-D5','总台数据看板','P2','总台入口 · 看板','GET /api/dashboard 聚合'],
+];
+document.getElementById('traceBody').innerHTML = FR.map(([id, name, pri, ui, api]) => {
+  const badge = pri === 'P0' ? 'b-success' : pri === 'P1' ? 'b-info' : 'b-muted';
+  return `<tr><td class="mono">${id}</td><td>${name}</td><td><span class="badge ${badge}">${pri}</span></td><td>${ui}</td><td><code class="api">${api}</code></td></tr>`;
+}).join('');
+</script>
+</body>
+</html>

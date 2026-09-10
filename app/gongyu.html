@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公域台 · 内容产出</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  /* 页面级样式: 仅用设计令牌, 不改共享文件 */
+  .comp-layers { grid-template-columns: 1fr; }            /* 三层纵向堆叠 (FR-A7) */
+  .wizard-dots { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .wdot { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--rule); color: var(--muted);
+    display: grid; place-items: center; font: 700 12px/1 var(--mono); background: var(--surface); flex: none; }
+  .wdot.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .wdot.done { border-color: var(--sage); color: var(--sage); }
+  .wdot-label { font: var(--caption); color: var(--ink); }
+  .wdot-sep { width: 16px; height: 1px; background: var(--rule); }
+  .draft-box { font: var(--body); line-height: 1.9; white-space: pre-wrap; background: var(--cream);
+    border: 1px solid var(--rule); border-radius: var(--r-card); padding: 16px; }
+  .sk-line { height: 14px; border-radius: 6px;
+    background: linear-gradient(100deg, var(--cream) 30%, var(--rule) 50%, var(--cream) 70%);
+    background-size: 200% 100%; animation: cpl-sk 1.1s linear infinite; }
+  .sk-line + .sk-line { margin-top: 10px; }
+  @keyframes cpl-sk { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  .scan-link { color: var(--accent-deep); text-decoration: underline; text-underline-offset: 3px;
+    font: var(--caption); padding: 0; }
+  .scan-link:hover { color: var(--accent); }
+  .form-grid { display: flex; flex-direction: column; gap: 14px; }
+  .form-grid label { font: var(--caption); color: var(--muted); display: block; margin-bottom: 6px; }
+  .form-grid input, .form-grid select { width: 100%; border: 1.5px solid var(--rule); border-radius: var(--r-btn);
+    padding: 8px 12px; background: var(--surface); font: var(--body); }
+  .form-grid input:focus, .form-grid select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="chrome"></div>
+
+<main class="wrap">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">公域台 · 内容产出</h1>
+      <p class="page-sub">扒对标、换理念、出文案、过合规 —— 上午 30 分钟，出一篇能直接交接剪辑的口播稿。 <span class="demo-tag">演示数据</span></p>
+    </div>
+    <span class="badge b-topic" id="poolBadge">选题池</span>
+  </div>
+
+  <!-- 1) 流水线区 -->
+  <section class="section" style="margin-top:0">
+    <div class="section-head"><h2 class="section-title">公域流水线</h2><span class="section-hint">点任意一步，看这一步替你干什么</span></div>
+    <div class="card card-pad"><div id="pipe"></div></div>
+  </section>
+
+  <!-- 2) 对标账号区 -->
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">盯着的对标账号</h2><span class="section-hint">点一个开盯就直接开始 · 对标账号已脱敏展示</span></div>
+    <div id="acctArea"></div>
+    <div class="mt16"><button class="btn" id="addAcct">+ 添加对标账号</button></div>
+  </section>
+
+  <!-- 3) 本周扫描汇总条 -->
+  <section class="section">
+    <div class="card card-pad">
+      <div class="kv">本周扫描：新增 <b>8</b> 条 · 入池 <b>6</b> 条 · <button class="scan-link" id="rejToggle" aria-expanded="false">挂不上钩自动筛除 <b>2</b> 条（留痕）▾</button></div>
+      <div id="rejPanel" hidden class="mt16"></div>
+    </div>
+  </section>
+
+  <!-- 4) 选题池区 -->
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">对标池 · 本周扫描</h2><span class="section-hint">排序：赞数 · 新鲜度 · 挂不上钩的自动筛</span></div>
+    <div class="caps" id="caps" role="group" aria-label="按状态筛选"></div>
+    <div class="mt16">
+      <table class="tbl">
+        <thead><tr>
+          <th>对标原内容</th><th style="width:36px"></th><th>换理念后 · 我们的选题</th><th style="width:96px">状态</th><th style="width:150px">操作</th>
+        </tr></thead>
+        <tbody id="topicBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="assets/data.js"></script>
+<script src="assets/common.js"></script>
+<script>
+CPL.renderChrome('gongyu');
+const esc = CPL.esc, fmtW = CPL.fmtW;
+
+/* ================= 状态（CPL.store 持久化，刷新保留） ================= */
+const statusOv = CPL.store.get('gongyu.topicStatus', {});
+const topics = CPL_DATA.topics.map(t => ({ ...t, status: statusOv[t.id] || t.status }));
+function saveStatus() { const m = {}; topics.forEach(t => (m[t.id] = t.status)); CPL.store.set('gongyu.topicStatus', m); }
+
+let accounts = CPL.store.get('gongyu.accounts', null);
+if (!Array.isArray(accounts)) accounts = CPL_DATA.accounts.map(a => ({ ...a }));
+accounts.forEach(a => { if (a.scanning) { a.scanning = false; if (a.watching) a.lastScan = '刚刚来过'; } }); // 刷新后复位扫描中态
+function saveAccounts() { CPL.store.set('gongyu.accounts', accounts); }
+
+/* ================= 1) 流水线 ================= */
+const STEPS = [
+  { label: '扫对标 · 进选题池', tip: '每天扫一遍你在盯的对标账号：赞数跑赢、又挂得上我们理念的自动进选题池；挂不上钩的筛除留痕，不打扰你。' },
+  { label: '理念选题 · 三选一', tip: '同一条爆款，用我们的方法论换三个理念角度。你挑一个最像自己会说的话，其余两条自动回收。' },
+  { label: '框架二选一', tip: '观点定了定骨架：冲突递进或案例实证，二选一直接开写，不用对着空白页发呆。' },
+  { label: '生成初稿', tip: '按选定的理念和框架出口播初稿。像你度低于 90% 不出稿，自动重写一遍再给你。' },
+  { label: '合规过审版', tip: '三层过审：规则库扫极限词 → 大模型复核原创度 → 你人工终审。三层全过，才算「合规过审版」。' },
+  { label: '剪辑发布（已在用）', ext: true, tip: '过审版直接交接你现有的剪辑发布流程 —— 生产线到这一步为止，不碰你已经跑顺的部分。' },
+];
+const pipeEl = document.getElementById('pipe');
+pipeEl.innerHTML = CPL.pipeline(STEPS, 0);
+CPL.$$('.pipe-step', pipeEl).forEach(b => b.onclick = () => {
+  const i = +b.dataset.step;
+  CPL.openModal(`
+    <div class="modal-head"><div><div class="modal-title">${esc(STEPS[i].label)}</div>
+    <div class="modal-sub">公域流水线 · 第 ${i + 1} 步</div></div><button class="modal-x" aria-label="关闭">×</button></div>
+    <div class="modal-body"><p style="font:var(--body);line-height:1.9">${esc(STEPS[i].tip)}</p></div>
+    <div class="modal-foot"><button class="btn modal-x">知道了</button></div>`);
+});
+
+/* ================= 2) 对标账号 ================= */
+const acctArea = document.getElementById('acctArea');
+const maskName = n => { n = String(n).trim(); return n.length <= 1 ? n + '*' : n[0] + '*' + n[n.length - 1]; };
+
+function renderAccounts() {
+  if (!accounts.length) {
+    acctArea.innerHTML = `<div class="card"><div class="empty">
+      <div class="empty-glyph">盯</div>
+      <div class="empty-text">先添加一个对标账号，点开盯就开工</div></div></div>`;
+    return;
+  }
+  acctArea.innerHTML = `<div class="acct-grid">` + accounts.map(a => `
+    <div class="card acct-card" data-id="${a.id}">
+      <div class="acct-top">
+        <span class="acct-avatar">${esc((a.full || a.name)[0])}</span>
+        <div><div class="acct-name">${esc(a.name)}</div><div class="acct-meta">${esc(a.platform)} · ${esc(a.track)}</div></div>
+      </div>
+      <div class="acct-meta">粉丝 ${fmtW(a.fans)} · 作品 ${a.works} 条</div>
+      <div class="acct-foot">
+        <span class="acct-scan">${a.scanning ? '<span class="badge b-scanning">扫描中</span>'
+          : a.watching ? '最近扫描 · ' + esc(a.lastScan)
+          : '<span class="muted">已暂停 · 开盯后自动扫描</span>'}</span>
+        <button class="btn btn-sm ${a.watching ? 'btn-ghost' : ''}" data-watch="${a.id}">${a.watching ? '暂停' : '开盯'}</button>
+      </div>
+    </div>`).join('') + `</div>`;
+}
+renderAccounts();
+
+acctArea.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-watch]');
+  if (!btn) return;
+  const a = accounts.find(x => x.id === btn.dataset.watch);
+  if (!a) return;
+  if (a.watching) {
+    a.watching = false; a.scanning = false;
+    saveAccounts(); renderAccounts();
+    CPL.toast(`已暂停盯「${esc(a.name)}」—— 暂停期间它的新爆款不进池`);
+  } else {
+    a.watching = true; a.scanning = true; a.lastScan = '扫描中';
+    saveAccounts(); renderAccounts();
+    CPL.toast(`已开盯「${esc(a.name)}」—— 10 分钟内完成首轮扫描`);
+    setTimeout(() => { a.scanning = false; a.lastScan = '刚刚来过'; saveAccounts(); renderAccounts(); }, 2200);
+  }
+});
+
+document.getElementById('addAcct').onclick = () => {
+  const m = CPL.openModal(`
+    <div class="modal-head"><div><div class="modal-title">添加对标账号</div>
+    <div class="modal-sub">填完直接开盯 · 列表里名称自动脱敏展示</div></div><button class="modal-x" aria-label="关闭">×</button></div>
+    <div class="modal-body"><form id="acctForm" class="form-grid">
+      <div><label for="fName">账号名</label><input id="fName" required placeholder="例如：商业巫师笔记"></div>
+      <div class="grid-2">
+        <div><label for="fPlat">平台</label><select id="fPlat"><option>抖音</option><option>视频号</option><option>小红书</option></select></div>
+        <div><label for="fTrack">赛道</label><input id="fTrack" required placeholder="例如：商业IP赛道"></div>
+      </div>
+      <div class="grid-2">
+        <div><label for="fFans">粉丝量</label><input id="fFans" type="number" min="0" required placeholder="例如：120000"></div>
+        <div><label for="fWorks">作品数</label><input id="fWorks" type="number" min="0" required placeholder="例如：48"></div>
+      </div>
+    </form></div>
+    <div class="modal-foot"><button class="btn btn-ghost" id="cancelAdd">再想想</button>
+    <button class="btn" type="submit" form="acctForm">开盯</button></div>`);
+  m.el.querySelector('#cancelAdd').onclick = m.close;
+  m.el.querySelector('#acctForm').onsubmit = e => {
+    e.preventDefault();
+    const full = m.el.querySelector('#fName').value.trim();
+    const a = {
+      id: 'a' + Date.now(), name: maskName(full), full,
+      platform: m.el.querySelector('#fPlat').value,
+      track: m.el.querySelector('#fTrack').value.trim() || '未分赛道',
+      fans: +m.el.querySelector('#fFans').value || 0,
+      works: +m.el.querySelector('#fWorks').value || 0,
+      watching: true, scanning: true, lastScan: '扫描中',
+    };
+    accounts.push(a); saveAccounts(); renderAccounts(); m.close();
+    CPL.toast(`已开盯「${esc(a.name)}」—— 首轮扫描 10 分钟内完成，新爆款直接进池`);
+    setTimeout(() => { a.scanning = false; a.lastScan = '刚刚来过'; saveAccounts(); renderAccounts(); }, 2600);
+  };
+};
+
+/* ================= 3) 本周扫描汇总条 ================= */
+const rejPanel = document.getElementById('rejPanel');
+const rejToggle = document.getElementById('rejToggle');
+rejPanel.innerHTML = topics.filter(t => t.status === '已筛除').map(t => `
+  <div class="feed-item"><span class="badge b-muted">已筛除</span>
+    <div class="feed-body">${esc(t.srcTitle)}<div class="kv mt8">${esc(t.note)} · ${esc(t.srcAcct)} · 赞 ${fmtW(t.srcLikes)}</div></div>
+  </div>`).join('');
+rejToggle.onclick = () => {
+  const open = rejPanel.hidden;
+  rejPanel.hidden = !open;
+  rejToggle.setAttribute('aria-expanded', String(open));
+  rejToggle.innerHTML = `挂不上钩自动筛除 <b>2</b> 条（留痕）${open ? '▴' : '▾'}`;
+};
+
+/* ================= 4) 选题池 ================= */
+const FILTERS = ['全部', '选题', '已出稿', '已淘汰'];
+const BADGE = { '选题': 'b-topic', '已出稿': 'b-drafted', '已淘汰': 'b-muted' };
+const capsEl = document.getElementById('caps');
+const tbody = document.getElementById('topicBody');
+const poolBadge = document.getElementById('poolBadge');
+let curFilter = '全部';
+
+function rowHtml(t) {
+  let ops = '';
+  if (t.status === '选题') ops = `<button class="btn btn-sm" data-act="draft">出稿</button> <button class="btn btn-sm btn-ghost" data-act="kill">淘汰</button>`;
+  else if (t.status === '已淘汰') ops = `<button class="btn btn-sm btn-ghost" data-act="restore">恢复</button>`;
+  else ops = `<button class="btn btn-sm btn-ghost" data-act="view">查看</button>`;
+  return `<tr data-id="${t.id}">
+    <td><div class="orig-title">${esc(t.srcTitle)}</div>
+      <div class="orig-metrics">赞 ${fmtW(t.srcLikes)} · ${esc(t.srcTime)} · ${esc(t.srcAcct)}</div></td>
+    <td class="arrow-cell">→</td>
+    <td><div class="new-title">${esc(t.newTitle)}</div>
+      <div class="orig-metrics">理念相关度 ${t.rel} / 100</div></td>
+    <td><span class="badge ${BADGE[t.status]}">${t.status}</span></td>
+    <td style="white-space:nowrap">${ops}</td></tr>`;
+}
+
+function renderPool() {
+  const pool = topics.filter(t => t.status !== '已筛除');
+  const cnt = k => (k === '全部' ? pool.length : pool.filter(t => t.status === k).length);
+  capsEl.innerHTML = FILTERS.map(k =>
+    `<button class="cap ${curFilter === k ? 'on' : ''}" data-f="${k}" aria-pressed="${curFilter === k}">${k} <b>${cnt(k)}</b></button>`).join('');
+  const list = pool.filter(t => curFilter === '全部' || t.status === curFilter).sort((a, b) => b.srcLikes - a.srcLikes);
+  tbody.innerHTML = list.length ? list.map(rowHtml).join('')
+    : `<tr><td colspan="5"><div class="empty"><div class="empty-glyph">筛</div>
+       <div class="empty-text">本周还没有挂得上钩的爆款——可调低相关度阈值，或再盯一个账号</div></div></td></tr>`;
+  poolBadge.textContent = `选题池 ${pool.length}`;
+}
+renderPool();
+
+capsEl.onclick = e => {
+  const c = e.target.closest('.cap'); if (!c) return;
+  curFilter = c.dataset.f; renderPool();
+};
+
+tbody.onclick = async e => {
+  const btn = e.target.closest('button[data-act]'); if (!btn) return;
+  const t = topics.find(x => x.id === btn.closest('tr').dataset.id); if (!t) return;
+  const act = btn.dataset.act;
+  if (act === 'kill') {
+    const ok = await CPL.confirmDialog({
+      title: '淘汰这条选题？',
+      body: `「${t.newTitle}」将移入已淘汰，保留 90 天可恢复；90 天后自动清除，不占池子。`,
+      okText: '淘汰', danger: true,
+    });
+    if (ok) { t.status = '已淘汰'; saveStatus(); renderPool(); CPL.toast('已淘汰 —— 保留 90 天，随时可恢复'); }
+  } else if (act === 'restore') {
+    t.status = '选题'; saveStatus(); renderPool();
+    CPL.toast('已恢复 —— 回到选题池，可继续出稿');
+  } else if (act === 'draft') {
+    openWorkbench(t);
+  } else if (act === 'view') {
+    viewDraft(t);
+  }
+};
+
+/* ================= 5) 出稿工作台（四步向导） ================= */
+function dots(step) {
+  const labels = ['理念三选一', '框架二选一', '生成初稿', '合规三层'];
+  return `<div class="wizard-dots">` + labels.map((l, i) => {
+    const n = i + 1;
+    const cls = n < step ? 'done' : n === step ? 'on' : '';
+    return `<span class="wdot ${cls}">${n < step ? '✓' : n}</span><span class="wdot-label"${n === step ? ' style="font-weight:700"' : ''}>${l}</span>${n < 4 ? '<span class="wdot-sep"></span>' : ''}`;
+  }).join('') + `</div>`;
+}
+
+function downloadTxt(name, text) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+const txtName = t => `口播稿-${t.newTitle.replace(/[\\/:*?"<>|]/g, '').slice(0, 40)}.txt`;
+
+function openWorkbench(topic) {
+  const wiz = { step: 1, idea: -1, frame: -1, draft: null, ideas: CPL_DATA.ideaOptions.map(o => ({ ...o })), timers: [] };
+  const m = CPL.openModal(`
+    <div class="modal-head"><div><div class="modal-title">出稿工作台</div>
+    <div class="modal-sub">${esc(topic.newTitle)}</div></div><button class="modal-x" aria-label="关闭">×</button></div>
+    <div id="wizRoot"></div>`, { large: true, onClose: () => wiz.timers.forEach(clearTimeout) });
+  const root = m.el.querySelector('#wizRoot');
+  const later = (fn, ms) => wiz.timers.push(setTimeout(() => { if (m.el.isConnected) fn(); }, ms));
+
+  function render() {
+    /* ---- 步骤 1: 理念三选一 ---- */
+    if (wiz.step === 1) {
+      root.innerHTML = `<div class="modal-body">${dots(1)}<div class="opt-list">` + wiz.ideas.map((o, i) => `
+        <button class="opt-card ${wiz.idea === i ? 'on' : ''}" data-i="${i}">
+          <span class="opt-tag">${esc(o.tag)}</span>
+          <div class="opt-title">${esc(o.title)}</div>
+          <div class="opt-desc">${esc(o.desc)}</div>
+        </button>`).join('') + `</div></div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="regen">重新生成</button>
+          <button class="btn" id="next1" ${wiz.idea < 0 ? 'disabled' : ''}>下一步</button>
+        </div>`;
+      CPL.$$('.opt-card', root).forEach(c => c.onclick = () => {
+        wiz.idea = +c.dataset.i;
+        CPL.$$('.opt-card', root).forEach(x => x.classList.toggle('on', +x.dataset.i === wiz.idea));
+        root.querySelector('#next1').disabled = false;
+      });
+      root.querySelector('#regen').onclick = e => CPL.withLoading(e.target, '生成中…', done => later(() => {
+        done(); wiz.idea = -1;
+        for (let i = wiz.ideas.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[wiz.ideas[i], wiz.ideas[j]] = [wiz.ideas[j], wiz.ideas[i]]; }
+        render(); CPL.toast('三个新理念方向已到位 —— 挑一个最像你口吻的');
+      }, 1200));
+      root.querySelector('#next1').onclick = () => { wiz.step = 2; render(); };
+    }
+    /* ---- 步骤 2: 框架二选一 ---- */
+    else if (wiz.step === 2) {
+      root.innerHTML = `<div class="modal-body">${dots(2)}<div class="opt-list">` + CPL_DATA.frameOptions.map((o, i) => `
+        <button class="opt-card ${wiz.frame === i ? 'on' : ''}" data-i="${i}">
+          <span class="opt-tag">${esc(o.tag)}</span>
+          <div class="opt-title">${esc(o.title)}</div>
+          <div class="opt-desc">${esc(o.desc)}</div>
+        </button>`).join('') + `</div></div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="back2">上一步</button>
+          <button class="btn" id="gen2" ${wiz.frame < 0 ? 'disabled' : ''}>生成初稿</button>
+        </div>`;
+      CPL.$$('.opt-card', root).forEach(c => c.onclick = () => {
+        wiz.frame = +c.dataset.i;
+        CPL.$$('.opt-card', root).forEach(x => x.classList.toggle('on', +x.dataset.i === wiz.frame));
+        root.querySelector('#gen2').disabled = false;
+      });
+      root.querySelector('#back2').onclick = () => { wiz.step = 1; render(); };
+      root.querySelector('#gen2').onclick = () => { wiz.step = 3; render(); };
+    }
+    /* ---- 步骤 3: 生成初稿 ---- */
+    else if (wiz.step === 3) {
+      if (wiz.draft === null) {
+        root.innerHTML = `<div class="modal-body">${dots(3)}
+          <div class="draft-box"><div class="sk-line" style="width:92%"></div><div class="sk-line" style="width:78%"></div>
+          <div class="sk-line" style="width:85%"></div><div class="sk-line" style="width:60%"></div>
+          <div class="sk-line" style="width:88%"></div><div class="sk-line" style="width:45%"></div></div>
+          <div class="kv mt8">按「${esc(wiz.ideas[wiz.idea].tag)} · ${esc(CPL_DATA.frameOptions[wiz.frame].tag)}」写稿中，像你度低于 90% 会自动重写</div></div>
+          <div class="modal-foot"><button class="btn" id="genBtn" disabled>生成中…</button></div>`;
+        CPL.withLoading(root.querySelector('#genBtn'), '生成中…', done => later(() => {
+          wiz.draft = CPL_DATA.draftText; done(); render();
+        }, 1800));
+      } else {
+        root.innerHTML = `<div class="modal-body">${dots(3)}
+          <div class="draft-box" id="draftBox">${esc(wiz.draft)}</div>
+          <div class="gen-meta mt8">
+            <span class="likeness">像你度 <b id="likeB">${CPL.likeness(wiz.draft)}%</b></span>
+            <span class="kv">来源：选题「${esc(topic.newTitle)}」 · 对标原文「${esc(CPL_DATA.draftSourceExcerpt)}」</span>
+          </div></div>
+          <div class="modal-foot">
+            <button class="btn btn-ghost" id="back3">上一步</button>
+            <button class="btn btn-ghost" id="rewrite">局部重写</button>
+            <button class="btn" id="toComp">进入合规审查 →</button>
+          </div>`;
+        root.querySelector('#back3').onclick = () => { wiz.step = 2; render(); };
+        root.querySelector('#rewrite').onclick = () => {
+          const paras = wiz.draft.split('\n\n');
+          const cand = paras.map((p, i) => [p, i]).filter(([p]) => p.trim().length > 20);
+          const [p, i] = cand[Math.floor(Math.random() * cand.length)];
+          const swaps = [['你是不是也这样', '是不是连你也这样'], ['我见过', '我之前碰到过一个'], ['结果呢', '到最后'],
+            ['今天给你', '今天直接把'], ['这不是神话, 是结构', '这没什么神奇的, 是结构搭对了'], ['评论区扣', '想要的朋友, 评论区扣']];
+          let np = p;
+          for (const [a, b] of swaps) if (np.includes(a)) { np = np.replace(a, b); break; }
+          if (np === p) np = p.replace(/。$/, '') + '，说白了就这一件事。';
+          paras[i] = np; wiz.draft = paras.join('\n\n');
+          root.querySelector('#draftBox').textContent = wiz.draft;
+          root.querySelector('#likeB').textContent = CPL.likeness(wiz.draft) + '%';
+          CPL.toast('已重写，同步进入学习信号');
+        };
+        root.querySelector('#toComp').onclick = () => { wiz.step = 4; render(); };
+      }
+    }
+    /* ---- 步骤 4: 合规三层 (FR-A7) ---- */
+    else if (wiz.step === 4) {
+      root.innerHTML = `<div class="modal-body">${dots(4)}<div class="comp-layers">
+        <div class="comp-layer doing" id="layer1"><div class="comp-name">第一层 · 规则库扫描</div>
+          <div class="comp-result">扫描中…</div><div class="comp-extra"></div></div>
+        <div class="comp-layer" id="layer2"><div class="comp-name">第二层 · 大模型复核 · 原创度检测</div>
+          <div class="comp-result" style="font:var(--body);color:var(--muted)">待开始</div><div class="comp-extra"></div></div>
+        <div class="comp-layer" id="layer3"><div class="comp-name">第三层 · 人工终审</div>
+          <div class="comp-result" style="font:var(--body);color:var(--muted)">待开始</div><div class="comp-extra"></div></div>
+      </div></div>
+      <div class="modal-foot"><span class="kv" style="margin-right:auto">三层全过，这篇稿子才允许进剪辑队列</span></div>`;
+      later(runLayer1, 600);
+    }
+    /* ---- 步骤 5: 成功态 ---- */
+    else {
+      root.innerHTML = `<div class="modal-body">${dots(5)}
+        <div class="row" style="gap:10px;flex-wrap:wrap"><span class="badge b-drafted">合规过审版</span>
+        <span style="font:var(--t3)">三层全过，可以交接剪辑</span></div>
+        <div class="draft-box mt16" style="max-height:320px;overflow:auto">${esc(wiz.draft)}</div></div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="cpBtn">复制文案</button>
+          <button class="btn btn-ghost" id="dlBtn">导出 .txt</button>
+          <button class="btn" id="finBtn">完成</button>
+        </div>`;
+      root.querySelector('#cpBtn').onclick = e => CPL.copyText(wiz.draft, e.target);
+      root.querySelector('#dlBtn').onclick = () => { downloadTxt(txtName(topic), wiz.draft); CPL.toast('已导出 .txt —— 直接发给剪辑即可'); };
+      root.querySelector('#finBtn').onclick = m.close;
+    }
+  }
+
+  function runLayer1() {
+    const L1 = root.querySelector('#layer1'); if (!L1) return;
+    const hits = CPL.complianceScan(wiz.draft);
+    if (hits.length) {
+      const total = hits.reduce((s, h) => s + h.count, 0);
+      L1.className = 'comp-layer hit';
+      L1.querySelector('.comp-result').textContent = `命中 ${total} 处风险`;
+      L1.querySelector('.comp-extra').innerHTML =
+        hits.map(h => `<div class="risk-item"><span class="risk-word">${esc(h.word)}</span>
+          <span class="risk-fix">${esc(h.type)} · ${esc(h.fix)}</span></div>`).join('')
+        + `<div class="draft-box mt8" style="max-height:200px;overflow:auto;font-size:13px">${CPL.highlightHits(wiz.draft, hits)}</div>
+           <button class="btn mt16" id="adoptAll">采纳全部建议</button>`;
+      L1.querySelector('#adoptAll').onclick = () => {
+        wiz.draft = wiz.draft.split('最好').join('更适合大多数人').split('第一').join('头部');
+        const left = CPL.complianceScan(wiz.draft);
+        L1.className = 'comp-layer done';
+        L1.querySelector('.comp-result').textContent = `重扫命中 ${left.length} 处 · 已通过`;
+        L1.querySelector('.comp-extra').innerHTML = `<div class="kv mt8">已替换：最好 → 更适合大多数人、第一 → 头部</div>`;
+        CPL.toast('已替换 2 类极限词 —— 改动同步进入学习信号');
+        runLayer2();
+      };
+    } else {
+      L1.className = 'comp-layer done';
+      L1.querySelector('.comp-result').textContent = '命中 0 处 · 通过';
+      runLayer2();
+    }
+  }
+
+  function runLayer2() {
+    const L2 = root.querySelector('#layer2'); if (!L2) return;
+    L2.className = 'comp-layer doing';
+    L2.querySelector('.comp-result').textContent = '复核中…';
+    later(() => {
+      const o = CPL.originality(wiz.draft, CPL_DATA.draftSourceExcerpt);
+      L2.className = 'comp-layer done';
+      L2.querySelector('.comp-result').textContent = '复核通过';
+      L2.querySelector('.comp-extra').innerHTML =
+        `<div class="kv mt8">与对标原文连续 8 字重合率 <b class="mono">${o.ratio}%</b> ≤ 15% · 通过</div>`;
+      const L3 = root.querySelector('#layer3');
+      L3.className = 'comp-layer doing';
+      L3.querySelector('.comp-result').textContent = '等你拍板';
+      L3.querySelector('.comp-extra').innerHTML = `<div class="row mt8" style="flex-wrap:wrap;gap:8px">
+        <button class="btn btn-danger" id="rej3">打回修改</button>
+        <button class="btn" id="ok3">终审通过 · 标记合规过审版</button></div>`;
+      L3.querySelector('#rej3').onclick = () => { wiz.step = 3; render(); CPL.toast('已打回，请按风险提示修改', false); };
+      L3.querySelector('#ok3').onclick = () => {
+        topic.status = '已出稿'; saveStatus(); renderPool();
+        const drafts = CPL.store.get('gongyu.drafts', {}); drafts[topic.id] = wiz.draft; CPL.store.set('gongyu.drafts', drafts);
+        wiz.step = 5; render();
+        CPL.toast('合规过审版已归档，可交接剪辑');
+      };
+    }, 1500);
+  }
+
+  render();
+}
+
+/* 查看已归档的过审版 */
+function viewDraft(t) {
+  const drafts = CPL.store.get('gongyu.drafts', {});
+  const text = drafts[t.id] || CPL_DATA.draftText;
+  const m = CPL.openModal(`
+    <div class="modal-head"><div><div class="modal-title">${esc(t.newTitle)}</div>
+    <div class="modal-sub"><span class="badge b-drafted">合规过审版</span> · 已交接剪辑</div></div>
+    <button class="modal-x" aria-label="关闭">×</button></div>
+    <div class="modal-body"><div class="draft-box" style="max-height:380px;overflow:auto">${esc(text)}</div></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="vCopy">复制文案</button>
+      <button class="btn btn-ghost" id="vDl">导出 .txt</button>
+      <button class="btn" id="vDone">完成</button>
+    </div>`, { large: true });
+  m.el.querySelector('#vCopy').onclick = e => CPL.copyText(text, e.target);
+  m.el.querySelector('#vDl').onclick = () => { downloadTxt(txtName(t), text); CPL.toast('已导出 .txt —— 直接发给剪辑即可'); };
+  m.el.querySelector('#vDone').onclick = m.close;
+}
+</script>
+</body>
+</html>

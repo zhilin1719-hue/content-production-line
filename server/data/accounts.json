@@ -1,0 +1,67 @@
+[
+ {
+  "id": "a1",
+  "projectId": "p-zeyu",
+  "name": "透*糖",
+  "full": "透视candy",
+  "platform": "抖音",
+  "track": "商业IP赛道",
+  "fans": 495000,
+  "works": 36,
+  "watching": true,
+  "lastScan": "昨天来过",
+  "status": "idle"
+ },
+ {
+  "id": "a2",
+  "projectId": "p-zeyu",
+  "name": "don*******ent",
+  "full": "dongfangzhenxuan-content",
+  "platform": "抖音",
+  "track": "商业IP赛道",
+  "fans": 320000,
+  "works": 58,
+  "watching": true,
+  "lastScan": "6 小时前来过",
+  "status": "idle"
+ },
+ {
+  "id": "a3",
+  "projectId": "p-zeyu",
+  "name": "商业参**长",
+  "full": "商业参谋长",
+  "platform": "抖音",
+  "track": "创业服务",
+  "fans": 882000,
+  "works": 124,
+  "watching": false,
+  "lastScan": "开盯后自动扫描",
+  "status": "paused"
+ },
+ {
+  "id": "ac1",
+  "projectId": "p-cenqc",
+  "name": "别*计",
+  "full": "别墅设计笔记",
+  "platform": "抖音",
+  "track": "别墅设计赛道",
+  "fans": 210000,
+  "works": 64,
+  "watching": true,
+  "lastScan": "昨天来过",
+  "status": "idle"
+ },
+ {
+  "id": "ac2",
+  "projectId": "p-cenqc",
+  "name": "设**叔",
+  "full": "设计大叔说宅",
+  "platform": "视频号",
+  "track": "别墅设计赛道",
+  "fans": 96000,
+  "works": 201,
+  "watching": false,
+  "lastScan": "开盯后自动扫描",
+  "status": "paused"
+ }
+]

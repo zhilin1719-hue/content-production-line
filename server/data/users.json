@@ -1,0 +1,49 @@
+[
+ {
+  "username": "admin",
+  "name": "总台管理员",
+  "role": "admin",
+  "projects": [
+   "p-zeyu",
+   "p-cenqc"
+  ],
+  "passHash": "bf6b5bdb74c79ece9fc0ad0ac9fb0359f9555d4f35a83b2e6ec69ae99e09603d"
+ },
+ {
+  "username": "operator",
+  "name": "内容操盘手",
+  "role": "operator",
+  "projects": [
+   "p-zeyu"
+  ],
+  "passHash": "deca5a7cdf9bef1fb8b0c9adede62926929e0fca67122c2e788fa6cc8a4923cd"
+ },
+ {
+  "username": "operator2",
+  "name": "岑晴川操盘手",
+  "role": "operator",
+  "projects": [
+   "p-cenqc"
+  ],
+  "passHash": "af260d310d2079f4e8b0b2cdd73ec59a390f9e54eec22013958b9cb5e5b5164a"
+ },
+ {
+  "username": "reviewer",
+  "name": "合规审核员",
+  "role": "reviewer",
+  "projects": [
+   "p-zeyu",
+   "p-cenqc"
+  ],
+  "passHash": "3e405a3b8337746f03e681dda65ffb2d65b406e6a9a2ada9598b391f848bdaf6"
+ },
+ {
+  "username": "viewer",
+  "name": "观察者",
+  "role": "viewer",
+  "projects": [
+   "p-zeyu"
+  ],
+  "passHash": "8d4ba708bdaf221fd6197300a9d6da11249ced6a8f846eb23f8f0123d8768a80"
+ }
+]

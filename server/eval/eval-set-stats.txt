@@ -1,0 +1,13 @@
+eval-set.jsonl 统计
+seed: 20260910 (确定性生成, 可复现)
+总数: 250
+  voice: 60
+  compliance: 60
+  originality: 60
+  semantic: 30
+  boundary: 40
+  其中 compliance 含变体样本: 15
+  voice 正样本(期望≥90): 45
+  voice 负样本(期望<90): 15
+  originality 打回组(重合>15%): 30
+  originality 通过组(重合≤15%): 30

@@ -1,0 +1,32 @@
+[
+ {
+  "id": "sl-0",
+  "projectId": "p-zeyu",
+  "accountId": "a3",
+  "time": "2026-09-03T20:19:55.661Z",
+  "found": 1,
+  "admitted": 0,
+  "rejected": [
+   {
+    "title": "三天起号秘籍: 新手照做就能爆",
+    "rel": 32,
+    "reason": "相关度低于阈值 40, 挂不上钩, 留痕不入池"
+   }
+  ]
+ },
+ {
+  "id": "sl-c0",
+  "projectId": "p-cenqc",
+  "accountId": "ac2",
+  "time": "2026-09-03T20:19:55.661Z",
+  "found": 1,
+  "admitted": 0,
+  "rejected": [
+   {
+    "title": "小白三天学会做别墅设计(引流课)",
+    "rel": 28,
+    "reason": "相关度低于阈值 40, 挂不上钩, 留痕不入池"
+   }
+  ]
+ }
+]

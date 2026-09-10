@@ -1,0 +1,39 @@
+# 裁判模型配置 (D5 · 与 docs/acceptance 测试报告互为引用)
+# 口径: DOC-08 §4.3 — 裁判做初筛, 裁判与人工结论不一致的样本进入人工抽检; 裁判模型每季度用人工标注集校准一次。
+
+version: v1.0
+date: 2026-09-10
+
+# ---------- 语义风险复核 (第二层, 对应提示词 P-07) ----------
+judge:
+  primary:
+    provider: demo-primary          # 主供应商 (NFR-12)
+    model: voiceprint-v2
+    role: 判断文案是否存在语义风险(承诺收益/制造焦虑/极限词变体)
+    output_contract: { semantic_risks: [{span, suggestion}], passed: bool, reason: string }
+  backup:
+    provider: demo-backup
+    model: voiceprint-v2-lite
+  vocabulary: eval-config.SEMANTIC_WORDS   # 裁判词表(可热更新, NFR-11)
+
+# ---------- 漏检率统计口径 (NFR-18) ----------
+sampling:
+  per_round: 400          # 每轮从「规则未命中」样本中抽 400 条人工复核
+  weekly_manual: 30       # 每周 30 条人工抽检清单(裁判与人工不一致样本优先)
+  miss_rate_target: 0.01  # ≤ 1%
+  calibration: quarterly  # 裁判模型每季度用人工标注集校准, 避免「用模型考模型」系统性偏差
+
+# ---------- 回归门禁 (发布阻断) ----------
+regression_gate:
+  trigger: [prompt_template, model_version, mix_strategy, temperature]
+  full_run: true                     # CI 对评测集全量重跑(STAGING 真实模型)
+  block_rules:
+    likeness_mean_regression: 0.02   # 像你度均值回退 > 2pp 阻断
+    intercept_rate_regression: 0.02  # 拦截率回退 > 2pp 阻断
+    miss_rate_regression: 0.02       # 漏检率恶化 > 2pp 阻断
+  evidence: [eval-report.json, eval-report.md]
+
+# ---------- 生产漂移监控 (周报) ----------
+drift_monitor:
+  weekly: [likeness_weekly_mean, regenerate_rate, final_review_reject_rate]
+  review_trigger: 0.05               # 环比劣化 > 5pp 触发复盘

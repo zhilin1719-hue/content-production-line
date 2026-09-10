@@ -1,0 +1,54 @@
+/* ============================================================
+   流量总台 · 内容生产线 — 设计令牌 (依据 DOC-07 UI 设计规范)
+   ============================================================ */
+:root {
+  /* 基础色 */
+  --cream: #F5F0E8;        /* 页面背景 */
+  --surface: #FFFFFF;      /* 卡片/表格 */
+  --ink: #3B342C;          /* 主文字 */
+  --muted: #9A8F80;        /* 次要文字/描述 (仅 ≥12px 辅助文字) */
+  --rule: #E2D7C5;         /* 描边/分隔 */
+
+  /* 主橙体系 */
+  --accent: #E06A3A;       /* 主行动/焦点/选中 */
+  --accent-deep: #D4551F;  /* 橙色文字/hover */
+  --accent-soft: #FBE9DE;  /* 选中底/选题徽章 */
+
+  /* 鼠尾草绿体系 */
+  --sage: #7C8B6D;         /* 完成态/朋友圈模块 */
+  --sage-soft: #EDF0E4;    /* 已出稿徽章/完成底 */
+
+  /* 状态与泳道色 */
+  --live: #C05040;         /* 进行/今日 「今日 D1」、正课期泳道块 */
+  --warmup: #8B7BA6;       /* 预热期泳道块、预热徽章 */
+  --warn: #E0A13A;         /* 收官/警示 水位告警 */
+  --info: #5B7E9E;         /* 通用信息徽章、其他场次泳道 */
+  --success: #5E8A57;      /* 已学会/已发/扫描就绪 */
+  --danger: #B0442F;       /* 连接异常/扫描失败/打回 */
+
+  /* 字阶: T1 26/800 · T2 18/700 · T3 15/700 · Body 14/400 · Caption 12/500 */
+  --t1: 800 26px/1.3 var(--font);
+  --t2: 700 18px/1.4 var(--font);
+  --t3: 700 15px/1.4 var(--font);
+  --body: 400 14px/1.6 var(--font);
+  --caption: 500 12px/1.5 var(--font);
+  --font: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+
+  /* 圆角 */
+  --r-card: 12px;
+  --r-btn: 8px;
+  --r-pill: 999px;
+
+  /* 阴影: 仅两档 */
+  --shadow-rest: 0 1px 4px rgba(59, 52, 44, .06);
+  --shadow-lift: 0 4px 14px rgba(224, 106, 58, .16);
+
+  /* 布局 */
+  --topbar-h: 64px;
+  --content-max: 1200px;
+
+  /* 动效: 仅状态反馈, ≤240ms */
+  --dur: 180ms;
+  --ease: cubic-bezier(.22, .61, .36, 1);
+}

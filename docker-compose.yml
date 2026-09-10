@@ -1,0 +1,46 @@
+# 流量总台 · 内容生产线 — 单机 Compose 编排
+# 对应开放决策点 D-7: 客户云服务器 16C/32G/500G, 单机 Compose。
+# 零 npm 依赖, 无外部数据库/缓存依赖; PostgreSQL/Redis/MinIO 为二期 API 化(D-2)预留位。
+
+services:
+  cpl:
+    build: .
+    container_name: cpl-server
+    restart: unless-stopped
+    ports:
+      - "8399:8399"
+    environment:
+      - NODE_ENV=production
+      - PORT=8399
+      # LLM 供应商注入: primary | backup | fail(演练主供应商故障, 验证 NFR-12 自动切换)
+      - LLM_PROVIDER=${LLM_PROVIDER:-primary}
+    volumes:
+      # 运行时数据(选题/稿件/场次/记账/审计)落宿主机, 备份脚本按此目录全量打包
+      - ./server/data:/app/server/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ---- 二期预留位(D-2 API 化后启用), 一期保持注释 ----
+  # postgres:
+  #   image: postgres:16-alpine
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: cpl
+  #     POSTGRES_USER: cpl
+  #     POSTGRES_PASSWORD: ${PG_PASSWORD:?请在 .env 设置}
+  #   volumes:
+  #     - ./pgdata:/var/lib/postgresql/data
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  # minio:
+  #   image: minio/minio
+  #   command: server /data --console-address ":9001"
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_USER:-cpl}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:?请在 .env 设置}
+  #   volumes:
+  #     - ./miniodata:/data

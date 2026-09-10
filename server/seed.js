@@ -1,0 +1,311 @@
+/* ============================================================
+   流量总台 · 内容生产线 — 种子数据
+   双项目: p-zeyu 泽宇·高净值变现IP / p-cenqc 岑晴川·别墅设计
+   内容与 app/assets/data.js 同源(演示数据), 适配多项目结构。
+   用法: node seed.js           → 数据目录为空时播种
+         node seed.js --reset   → 清空数据目录后重新播种
+   ============================================================ */
+'use strict';
+
+const crypto = require('crypto');
+const store = require('./store');
+const CONFIG = require('./config');
+
+function passHash(username, password) {
+  return crypto.createHash('sha256').update(username + ':' + password).digest('hex');
+}
+function nowMinusDays(n) { return new Date(Date.now() - n * 24 * 3600 * 1000).toISOString(); }
+
+/* ==================== 项目 · 声纹/理念库/文案变体 ==================== */
+
+const ZEYU = {
+  id: 'p-zeyu',
+  name: '泽宇 · 高净值变现IP',
+  host: '泽宇',
+  track: '高净值变现',
+  desc: '把专业卖成高客单: 定价三段论 + 私域成交系统(演示项目)',
+  voice: {
+    role: '顾问',
+    leadMagnet: '《报价 10 倍手册》',
+    hookWord: '定价',
+    lexicon: ['定价', '客单价', '高客单', '低客单', '结果', '系统', '结构', '筛选', '案例', '核验', '方法论', '私域',
+      '成交', '锚点', '高净值', '朋友圈', '内耗', '报价', '专业', '收窄', '拆解', '人群', '流量', '变现', '生意',
+      '简单', '稳定', '动作', '客户', '承诺', '顾问', '重复', '信任', '钩子'],
+    golden: [
+      '定位选对, 客户会自己把你从人群里挑出来。',
+      '你短缺的不是努力, 是把力气用对地方。',
+      '敢报高价的人, 先过了自己心里那关。',
+    ],
+    samples: [
+      '你是不是也这样: 课越卖越便宜, 人越干越累?\n\n我见过最好的一个咨询师, 专业没得说, 报价永远不敢超过三千。结果呢, 客户不珍惜, 自己也耗干。\n\n低客单不是引流, 是内耗。今天给你高客单定价的三段论:\n第一, 把价值锚点从「我的时间」换成「客户的结果」;\n第二, 用已核验的案例数字做结果承诺;\n第三, 设一道筛选门槛, 敢拒绝不合适的人。\n\n评论区扣「定价」, 我把《报价 10 倍手册》发你。',
+      '高客单顾问和低客单顾问的区别, 不在专业, 在报价单的结构。\n\n低客单报价单写的是「我帮你做什么」;\n高客单报价单写的是「你能拿到什么结果」。\n\n同一个专业, 两种写法, 客单价差 20 倍。\n\n今天把这句话送给你: 你短缺的不是努力, 是把力气用对地方。',
+      '很多人问我定价怎么定。\n\n先看你的客户在为什么付钱: 为时间, 还是为结果。\n\n为时间付钱, 你永远在跟同行卷单价;\n为结果付钱, 你在跟客户的目标对齐。\n\n定价三段论: 价值锚点 → 结果承诺 → 筛选门槛。明天展开讲。',
+      '岑晴川找到我的时候, 别墅设计一单收 2 万, 忙得脚不沾地。\n\n我们只动了两处: 把报价从「按面积」改成「按结果」, 再加一道客户筛选。\n\n两个月, 客单价 45 万, 签了 10 单。\n\n数字都核对了, 在案例库里躺着。想看拆解的, 评论区扣 1。',
+      '下午在球场打了九洞, 想明白一件事:\n\n打球和做生意一样, 动作越简单, 结果越稳定。\n\n回去把报价单又砍了一半的字。\n\n(配图是今天的第 7 洞)',
+    ],
+    cases: [
+      { name: '岑晴川', domain: '别墅设计赛道', from: '2 万', to: '45 万', period: '两个月', deals: 10 },
+      { name: '疗愈赛道学员', domain: '疗愈赛道', from: '泛人群定位', to: '成交率 ×3', period: '一次收窄', deals: null },
+    ],
+  },
+  ideas: [
+    { name: '反内耗', formula: '定价三段论', method: '价值锚点 → 结果承诺 → 筛选门槛', titleTpl: '{pain}: {formula}' },
+    { name: '卖结果', formula: '按结果定价', method: '已核验案例数字做支撑', titleTpl: '客户不为你的时间付钱, 只为结果付钱' },
+    { name: '筛选', formula: '挑客户方法论', method: '把「挑客户」讲成方法论', titleTpl: '敢拒绝的{role}, 才配得上高客单' },
+  ],
+  hooks: ['《高净值变现路线图》', '《报价 10 倍手册》', '《顾问式成交手册》', '《进化一把手》'],
+  momentVariants: {
+    ganhuo: [
+      '高客单顾问和低客单顾问的区别, 不在专业, 在报价单的结构。\n\n低客单报价单写的是「我帮你做什么」;\n高客单报价单写的是「你能拿到什么结果」。\n\n同一个专业, 两种写法, 客单价差 20 倍。\n\n今天把这句话送给你: 你短缺的不是努力, 是把力气用对地方。',
+      '很多人问我定价怎么定。\n\n先看你的客户在为什么付钱: 为时间, 还是为结果。\n\n为时间付钱, 你永远在跟同行卷单价;\n为结果付钱, 你在跟客户的目标对齐。\n\n定价三段论: 价值锚点 → 结果承诺 → 筛选门槛。明天展开讲。',
+      '一个反直觉的事实: 涨价之后, 成交率反而可能变高。\n\n因为价格是筛选器, 不只是收入。\n低价格吸引来的是比价的人; 高价格吸引来的是要结果的人。\n\n后者好服务十倍。',
+    ],
+    anli: [
+      '岑晴川找到我的时候, 别墅设计一单收 2 万, 忙得脚不沾地。\n\n我们只动了两处: 把报价从「按面积」改成「按结果」, 再加一道客户筛选。\n\n两个月, 客单价 45 万, 签了 10 单。\n\n数字都核对了, 在案例库里躺着。想看拆解的, 评论区扣 1。',
+      '上周五复盘了一个案例: 疗愈赛道的学员, 把定位从「所有焦虑的人」收窄到「35+ 高压女高管」。\n\n听起来市场变小了, 实际成交率翻了三倍。\n\n定位越窄, 钩子越尖。',
+    ],
+    shenghuo: [
+      '下午在球场打了九洞, 想明白一件事:\n\n打球和做生意一样, 动作越简单, 结果越稳定。\n\n回去把报价单又砍了一半的字。\n\n(配图是今天的第 7 洞)',
+      '海边待了两天, 没带电脑。\n\n手机里最常住的还是备忘录, 想到一句记一句:\n「敢报高价的人, 先过了自己心里那关。」\n\n回来慢慢展开。',
+    ],
+    dianping: [
+      '收到一条学员评价, 看完挺感慨:\n\n「定位选对, 客户会自己把你从人群里挑出来。」\n\n这话不是我说的, 是做完定位收窄的学员自己悟到的。\n\n好的方法论, 最后都长成了客户自己的话。',
+    ],
+    chengjiao: [
+      '今天签了一单 45w 的年度顾问。\n\n对方说选我的原因很简单: 翻了我三个月朋友圈, 每一条都在讲同一件事。\n\n重复, 是高客单成交里最被低估的动作。',
+    ],
+    jushen: [
+      '这周拒了 3 位想报名的朋友。\n\n不是端着, 是真的不合适: 业务模式还没到能承接高客单的阶段, 进来也是浪费钱。\n\n敢拒绝, 这门生意才做得长。',
+    ],
+  },
+};
+
+const CENQC = {
+  id: 'p-cenqc',
+  name: '岑晴川 · 别墅设计',
+  host: '岑晴川',
+  track: '别墅设计',
+  desc: '别墅全案设计变现: 收窄定位 + 结果化交付(演示项目)',
+  voice: {
+    role: '设计师',
+    leadMagnet: '《全案设计交付手册》',
+    hookWord: '全案',
+    lexicon: ['别墅', '设计', '全案', '散单', '交付', '结果', '结构', '筛选', '案例', '核验', '拆解', '定位', '收窄',
+      '业主', '报价', '高客单', '客单价', '效果图', '实景', '图纸', '节点', '施工', '口碑', '转介', '简单', '稳定',
+      '生意', '重复', '信任', '审美', '居住', '合同', '方法论'],
+    golden: [
+      '设计不是画图, 是把居住结果卖出去。',
+      '定位收得越窄, 业主越认你。',
+      '敢接高客单的设计师, 先敢拒绝不合适的单。',
+    ],
+    samples: [
+      '你是不是也这样: 图越画越多, 单越接越散?\n\n我见过最好的一个设计师, 审美没得说, 报价永远停在八千一张效果图。结果呢, 业主只当你是画图工具, 自己也耗干。\n\n散单不是积累, 是损耗。今天给你全案设计的三段论:\n第一, 把价值锚点从「图纸张数」换成「居住结果」;\n第二, 用已核验的实景案例做交付承诺;\n第三, 设一道业主筛选门槛, 敢拒绝不合适的单。\n\n评论区扣「全案」, 我把《全案设计交付手册》发你。',
+      '别墅设计的高客单, 不在效果图画得多炫, 在交付结构。\n\n散单设计卖的是「几张图」;\n全案设计卖的是「住进去的结果」。\n\n同一个设计师, 两种卖法, 客单价差 15 倍。\n\n今天把这句话送给你: 定位收得越窄, 业主越认你。',
+      '很多业主问我怎么选设计师。\n\n先看他敢不敢聊交付: 只聊图纸的, 在卖时间;\n聊入住结果的, 在卖确定性。\n\n全案三段论: 效果锚点 → 阶段交付 → 口碑转介。明天展开讲。',
+      '王工找到我的时候, 独栋别墅只敢接 8 万的散单, 年年忙在改图上。\n\n我们只动了两处: 把报价从「按张数」改成「按结果」, 再加一道业主筛选。\n\n三个月, 全案 120 万, 签了 3 单。\n\n数字都核对了, 在案例库里躺着。想看拆解的, 评论区扣 1。',
+      '工地待了一天, 想明白一件事:\n\n好设计和好施工一样, 节点越清楚, 结果越稳定。\n\n(配图是今天的实景交底)',
+    ],
+    cases: [
+      { name: '王工', domain: '独栋别墅业主', from: '8 万散单', to: '120 万全案', period: '三个月', deals: 3 },
+    ],
+  },
+  ideas: [
+    { name: '收窄定位', formula: '人群收窄三步', method: '赛道 → 人群 → 交付物', titleTpl: '{pain}: {formula}' },
+    { name: '卖结果', formula: '结果化报价', method: '效果锚点 → 阶段交付 → 口碑转介', titleTpl: '业主不为图纸付钱, 只为住进去的结果付钱' },
+    { name: '筛选', formula: '业主筛选论', method: '把「挑单」讲成方法论', titleTpl: '敢拒绝的{role}, 才配得上全案高客单' },
+  ],
+  hooks: ['《别墅全案交付路线图》', '《全案设计交付手册》', '《业主沟通手册》', '《实景作品集》'],
+  momentVariants: {
+    ganhuo: [
+      '别墅设计的高客单, 不在效果图画得多炫, 在交付结构。\n\n散单设计卖的是「几张图」;\n全案设计卖的是「住进去的结果」。\n\n同一个设计师, 两种卖法, 客单价差 15 倍。\n\n今天把这句话送给你: 定位收得越窄, 业主越认你。',
+      '很多业主问我怎么选设计师。\n\n先看他敢不敢聊交付: 只聊图纸的, 在卖时间;\n聊入住结果的, 在卖确定性。\n\n全案三段论: 效果锚点 → 阶段交付 → 口碑转介。明天展开讲。',
+    ],
+    anli: [
+      '王工找到我的时候, 独栋别墅只敢接 8 万的散单, 年年忙在改图上。\n\n我们只动了两处: 把报价从「按张数」改成「按结果」, 再加一道业主筛选。\n\n三个月, 全案 120 万, 签了 3 单。\n\n数字都核对了, 在案例库里躺着。想看拆解的, 评论区扣 1。',
+    ],
+    shenghuo: [
+      '工地待了一天, 想明白一件事:\n\n好设计和好施工一样, 节点越清楚, 结果越稳定。\n\n(配图是今天的实景交底)',
+      '周末去了趟老宅, 没带图纸。\n\n手机里最常住的还是备忘录, 想到一句记一句:\n「敢接高客单的设计师, 先敢拒绝不合适的单。」\n\n回来慢慢展开。',
+    ],
+    dianping: [
+      '收到一条业主评价, 看完挺感慨:\n\n「实景比效果图还好看。」\n\n这话不是我说的, 是全案交付完的业主自己说的。\n\n好的设计, 最后都长成了业主自己的生活。',
+    ],
+    chengjiao: [
+      '今天签了一单 120w 的全案设计。\n\n业主说选我的原因很简单: 翻了我三个月朋友圈, 每一条都在讲同一件事。\n\n重复, 是高客单成交里最被低估的动作。',
+    ],
+    jushen: [
+      '这周拒了 3 位想做设计的朋友。\n\n不是端着, 是真的不合适: 预算还停留在买图纸的阶段, 进来也是浪费钱。\n\n敢拒绝, 这门生意才做得长。',
+    ],
+  },
+};
+
+/* ==================== 演示内容(与 data.js 同源) ==================== */
+
+const ZEYU_ACCOUNTS = [
+  { id: 'a1', projectId: 'p-zeyu', name: '透*糖', full: '透视candy', platform: '抖音', track: '商业IP赛道', fans: 495000, works: 36, watching: true, lastScan: '昨天来过', status: 'idle' },
+  { id: 'a2', projectId: 'p-zeyu', name: 'don*******ent', full: 'dongfangzhenxuan-content', platform: '抖音', track: '商业IP赛道', fans: 320000, works: 58, watching: true, lastScan: '6 小时前来过', status: 'idle' },
+  { id: 'a3', projectId: 'p-zeyu', name: '商业参**长', full: '商业参谋长', platform: '抖音', track: '创业服务', fans: 882000, works: 124, watching: false, lastScan: '开盯后自动扫描', status: 'paused' },
+];
+const CENQC_ACCOUNTS = [
+  { id: 'ac1', projectId: 'p-cenqc', name: '别*计', full: '别墅设计笔记', platform: '抖音', track: '别墅设计赛道', fans: 210000, works: 64, watching: true, lastScan: '昨天来过', status: 'idle' },
+  { id: 'ac2', projectId: 'p-cenqc', name: '设**叔', full: '设计大叔说宅', platform: '视频号', track: '别墅设计赛道', fans: 96000, works: 201, watching: false, lastScan: '开盯后自动扫描', status: 'paused' },
+];
+
+const ZEYU_TOPICS = [
+  { id: 't1', projectId: 'p-zeyu', srcTitle: '为什么我劝你别再做低客单: 一个咨询师的定价血泪史', srcLikes: 42000, srcTime: '2 天前', srcAcct: '透*糖', srcExcerpt: '为什么我劝你别再做低客单: 一个咨询师的定价血泪史。课越卖越便宜人越干越累, 低客单不是引流是内耗……', newTitle: '低客单不是引流, 是内耗: 高客单顾问的定价三段论', status: '选题', rel: 92, createdAt: nowMinusDays(2) },
+  { id: 't2', projectId: 'p-zeyu', srcTitle: '从月销 30 万到 300 万, 她只改了报价单上的一行字', srcLikes: 38000, srcTime: '3 天前', srcAcct: 'don*******ent', srcExcerpt: '从月销 30 万到 300 万, 她只改了报价单上的一行字。把卖时间改成卖结果, 报价结构决定客单价……', newTitle: '报价单上的那一行: 把「卖时间」改成「卖结果」', status: '选题', rel: 88, createdAt: nowMinusDays(3) },
+  { id: 't3', projectId: 'p-zeyu', srcTitle: '别再卷流量了, 高净值客户根本不在直播间', srcLikes: 26000, srcTime: '1 天前', srcAcct: '透*糖', srcExcerpt: '别再卷流量了, 高净值客户根本不在直播间。私域才是高客单的成交场……', newTitle: '高净值客户在哪: 三个不在公域的成交场', status: '选题', rel: 85, createdAt: nowMinusDays(1) },
+  { id: 't4', projectId: 'p-zeyu', srcTitle: '一个人做知识付费, 怎么年入千万还不累死', srcLikes: 21000, srcTime: '4 天前', srcAcct: '商业参**长', srcExcerpt: '一个人做知识付费, 怎么年入千万还不累死。SOP 比才华重要, 系统替你跑……', newTitle: '千万级一人公司的背面: SOP 比才华重要', status: '已出稿', rel: 81, createdAt: nowMinusDays(4) },
+  { id: 't5', projectId: 'p-zeyu', srcTitle: '朋友圈成交的底层逻辑: 不是发广告, 是养信任', srcLikes: 19000, srcTime: '5 天前', srcAcct: '透*糖', srcExcerpt: '朋友圈成交的底层逻辑: 不是发广告, 是养信任。重复是高客单成交里最被低估的动作……', newTitle: '信任账户: 每天存一点, 成交时一次取', status: '选题', rel: 78, createdAt: nowMinusDays(5) },
+  { id: 't6', projectId: 'p-zeyu', srcTitle: '做 IP 第三年, 我把 80% 的社群都解散了', srcLikes: 15000, srcTime: '6 天前', srcAcct: 'don*******ent', srcExcerpt: '做 IP 第三年, 我把 80% 的社群都解散了。只留下愿意付钱的那 20%……', newTitle: '社群做减法: 只留下愿意付钱的那 20%', status: '选题', rel: 74, createdAt: nowMinusDays(6) },
+  { id: 't0', projectId: 'p-zeyu', srcTitle: '三天起号秘籍: 新手照做就能爆', srcLikes: 51000, srcTime: '1 周前', srcAcct: '商业参**长', srcExcerpt: '三天起号秘籍: 新手照做就能爆……', newTitle: '', status: '已筛除', rel: 32, note: '相关度低于阈值 40, 未入池(留痕)', createdAt: nowMinusDays(7) },
+];
+const CENQC_TOPICS = [
+  { id: 'tc1', projectId: 'p-cenqc', srcTitle: '别墅设计师为什么不接散单: 一个从业十年的忠告', srcLikes: 33000, srcTime: '2 天前', srcAcct: '别*计', srcExcerpt: '别墅设计师为什么不接散单: 一个从业十年的忠告。散单是设计力的漏斗损耗……', newTitle: '散单是设计力的漏斗损耗: 全案设计师的三道筛选', status: '选题', rel: 89, createdAt: nowMinusDays(2) },
+  { id: 'tc2', projectId: 'p-cenqc', srcTitle: '效果图再美也签不了高客单, 业主只信实景', srcLikes: 28000, srcTime: '3 天前', srcAcct: '设**叔', srcExcerpt: '效果图再美也签不了高客单, 业主只信实景。实景案例是设计师最好的获客资产……', newTitle: '实景即信任: 别墅设计师的作品资产管理', status: '选题', rel: 84, createdAt: nowMinusDays(3) },
+  { id: 'tc3', projectId: 'p-cenqc', srcTitle: '一单从 8 万做到 120 万, 他只改了报价方式', srcLikes: 24000, srcTime: '5 天前', srcAcct: '别*计', srcExcerpt: '一单从 8 万做到 120 万, 他只改了报价方式。按张数报价改成按结果交付……', newTitle: '按结果交付: 别墅全案的报价革命', status: '已出稿', rel: 80, createdAt: nowMinusDays(5) },
+  { id: 'tc4', projectId: 'p-cenqc', srcTitle: '小白三天学会做别墅设计(引流课)', srcLikes: 41000, srcTime: '1 周前', srcAcct: '设**叔', srcExcerpt: '小白三天学会做别墅设计……', newTitle: '', status: '已筛除', rel: 28, note: '相关度低于阈值 40, 未入池(留痕)', createdAt: nowMinusDays(7) },
+];
+
+const ZEYU_DRAFTS = [
+  {
+    id: 'd-seed-1', projectId: 'p-zeyu', topicId: 't4',
+    idea: { tag: '理念三 · 筛选', title: '千万级一人公司的背面: SOP 比才华重要' },
+    frame: { tag: '框架 A · 冲突递进', title: '钩子 → 冲突 → 展开 → 收尾' },
+    text: '你是不是也这样: 一个人做知识付费, 事越揽越多?\n\n我见过更适合大多数人的一个创业者, 才华没得说, 什么都自己扛。结果呢, 客户多了, 系统没跟上, 自己先耗干。\n\n一个人做到千万的背面, 是 SOP 比才华重要。今天把结构拆开:\n头部, 把价值锚点从「我的时间」换成「客户的结果」;\n第二, 用已核验的案例数字做结果承诺;\n第三, 设一道筛选门槛, 敢拒绝不合适的人。\n\n评论区扣「SOP」, 我把进化手册发你。',
+    likeness: 94.6, status: '合规过审版', compliancePassed: true, reviewPassed: true, createdAt: nowMinusDays(4),
+  },
+];
+const CENQC_DRAFTS = [
+  {
+    id: 'd-seed-c1', projectId: 'p-cenqc', topicId: 'tc3',
+    idea: { tag: '理念二 · 卖结果', title: '按结果交付: 别墅全案的报价革命' },
+    frame: { tag: '框架 B · 案例实证', title: '案例开场 → 拆解 → 迁移 → 行动指令' },
+    text: '先说一个案例: 我们客户王工, 独栋别墅业主, 三个月把客单价从 8 万散单 做到 120 万全案, 签了 3 单。\n\n拆开看, 头部那批设计师只做对了三件事:\n报价按结果不按张数: 交付物写进合同, 实景可核验;\n定位收窄: 只服务付得起、也值得服务的业主;\n系统替代才华: 把交付做成节点结构。\n\n设计不是画图, 是把居住结果卖出去。',
+    likeness: 93.8, status: '合规过审版', compliancePassed: true, reviewPassed: true, createdAt: nowMinusDays(5),
+  },
+];
+
+const POOL_COUNTS = {
+  'p-zeyu':   { ganhuo: 34, anli: 18, shenghuo: 22, dianping: 9, chengjiao: 12, jushen: 4 },
+  'p-cenqc':  { ganhuo: 21, anli: 14, shenghuo: 16, dianping: 7, chengjiao: 6,  jushen: 3 },
+};
+
+const ZEYU_SESSIONS = [
+  { id: 's1', projectId: 'p-zeyu', title: '有流量, 却卡在变现: 博主突破千万的私域成交系统课', host: '泽宇', audience: '百万粉丝、月入不过万的博主', hook: '《高净值变现路线图》', warmStart: '2026-08-21', openDay: '2026-08-24', endDay: '2026-08-28', status: '预热中', today: 'D1', progress: '预热 1/3' },
+  { id: 's2', projectId: 'p-zeyu', title: '从百万到千万: 高净值变现的三把钥匙', host: '泽宇', audience: '卡在百万的成熟博主', hook: '《报价 10 倍手册》', warmStart: '2026-08-03', openDay: '2026-08-06', endDay: '2026-08-10', status: '已收官', progress: '已收官' },
+  { id: 's3', projectId: 'p-zeyu', title: '疗愈行业高客单变现: 定位收窄实战', host: '泽宇', audience: '疗愈赛道从业者', hook: '《顾问式成交手册》', warmStart: '2026-08-18', openDay: '2026-08-21', endDay: '2026-08-25', status: '正课中', progress: '已发 4/5' },
+  { id: 's4', projectId: 'p-zeyu', title: '小团队做千万: 业务自运转系统', host: '泽宇', audience: '3-10 人小团队一把手', hook: '《进化一把手》', warmStart: '2026-08-28', openDay: '2026-08-31', endDay: '2026-09-04', status: '筹备中', progress: '筹备中' },
+];
+const CENQC_SESSIONS = [
+  { id: 'sc1', projectId: 'p-cenqc', title: '别墅设计高客单: 全案交付系统课', host: '岑晴川', audience: '想接全案的设计师', hook: '《别墅全案交付路线图》', warmStart: '2026-09-07', openDay: '2026-09-10', endDay: '2026-09-14', status: '预热中', today: 'D1', progress: '预热 1/3' },
+  { id: 'sc2', projectId: 'p-cenqc', title: '从散单到全案: 设计师定位收窄课', host: '岑晴川', audience: '被散单拖住的设计师', hook: '《全案设计交付手册》', warmStart: '2026-08-10', openDay: '2026-08-13', endDay: '2026-08-17', status: '已收官', progress: '已收官' },
+];
+
+const ZEYU_COURSE = [
+  { id: 'c-s1-1', projectId: 'p-zeyu', sessionId: 's1', day: 1, theme: '财富赛道从百万到千万的三层地图: 你专业这么强, 为什么卡在百万?', hook: '《高净值变现路线图》', caseRef: '', status: '已发', photos: 3 },
+  { id: 'c-s1-2', projectId: 'p-zeyu', sessionId: 's1', day: 2, theme: '第一把钥匙: 换人群 —— 把同一身专业, 卖给付得起的高净值', hook: '《报价 10 倍手册》', caseRef: '案例: 李笑来', status: '已发', photos: 3 },
+  { id: 'c-s1-3', projectId: 'p-zeyu', sessionId: 's1', day: 3, theme: '第二把钥匙: 把「卖专业」升级成「卖结果」 —— 高客单顾问产品怎么设计', hook: '《顾问式成交手册》', caseRef: '案例: 古典', status: '已发', photos: 3 },
+  { id: 'c-s1-4', projectId: 'p-zeyu', sessionId: 's1', day: 4, theme: '第三把钥匙: 标准化 SOP + 搭团队 —— 从一个人累死, 到业务自运转', hook: '《进化一把手》', caseRef: '案例: 张一鸣', status: '已发', photos: 0 },
+  { id: 'c-s1-5', projectId: 'p-zeyu', sessionId: 's1', day: 5, theme: '一对一帮你把这套用到你自己的专业上', hook: '一对一环节', caseRef: '', status: '未发', photos: 0 },
+  { id: 'c-s3-5', projectId: 'p-zeyu', sessionId: 's3', day: 5, theme: '一对一帮你把定位收窄用到自己的赛道上', hook: '一对一环节', caseRef: '', status: '未发', photos: 0 },
+];
+const CENQC_COURSE = [
+  { id: 'c-sc1-5', projectId: 'p-cenqc', sessionId: 'sc1', day: 5, theme: '一对一帮你把全案报价用到自己的客户上', hook: '一对一环节', caseRef: '', status: '未发', photos: 0 },
+];
+
+const USERS = [
+  { username: 'admin',     name: '总台管理员',   role: 'admin',    projects: ['p-zeyu', 'p-cenqc'], passHash: passHash('admin', 'admin123') },
+  { username: 'operator',  name: '内容操盘手',   role: 'operator', projects: ['p-zeyu'],            passHash: passHash('operator', 'op123') },
+  { username: 'operator2', name: '岑晴川操盘手', role: 'operator', projects: ['p-cenqc'],           passHash: passHash('operator2', 'op123') },
+  { username: 'reviewer',  name: '合规审核员',   role: 'reviewer', projects: ['p-zeyu', 'p-cenqc'], passHash: passHash('reviewer', 'rev123') },
+  { username: 'viewer',    name: '观察者',       role: 'viewer',   projects: ['p-zeyu'],            passHash: passHash('viewer', 'view123') },
+];
+
+const LEDGER_SEED = [
+  { id: 'lg-1', projectId: 'p-zeyu', type: 'moment', refId: null, time: '昨天 18:22', text: '敢报高价的人, 先过了自己心里那关……', pool: '干货' },
+  { id: 'lg-2', projectId: 'p-zeyu', type: 'moment', refId: null, time: '昨天 09:15', text: '高客单成交里最被低估的动作: 重复……', pool: '成交' },
+  { id: 'lg-3', projectId: 'p-cenqc', type: 'moment', refId: null, time: '昨天 20:40', text: '定位收得越窄, 业主越认你……', pool: '干货' },
+];
+
+const SCAN_LOG_SEED = [
+  {
+    id: 'sl-0', projectId: 'p-zeyu', accountId: 'a3', time: nowMinusDays(7),
+    found: 1, admitted: 0,
+    rejected: [{ title: '三天起号秘籍: 新手照做就能爆', rel: 32, reason: '相关度低于阈值 40, 挂不上钩, 留痕不入池' }],
+  },
+  {
+    id: 'sl-c0', projectId: 'p-cenqc', accountId: 'ac2', time: nowMinusDays(7),
+    found: 1, admitted: 0,
+    rejected: [{ title: '小白三天学会做别墅设计(引流课)', rel: 28, reason: '相关度低于阈值 40, 挂不上钩, 留痕不入池' }],
+  },
+];
+
+/* ==================== 播种 ==================== */
+
+function buildCollections() {
+  const projects = [];
+  for (const P of [ZEYU, CENQC]) {
+    projects.push({
+      id: P.id, name: P.name, host: P.host, track: P.track, desc: P.desc,
+      voice: P.voice, ideas: P.ideas, hooks: P.hooks, momentVariants: P.momentVariants,
+      sources: [
+        { id: 'voice', name: '声纹引擎', icon: '声', status: 'ok', desc: '干货口吻模型就绪 · 像你度 97.2% → 灌入「干货」池' },
+        { id: 'case', name: '案例库', icon: '案', status: 'ok', desc: '已核验案例待命 → 在「案例」池待命' },
+        { id: 'life', name: '生活素材库', icon: '图', status: 'ok', desc: '实景/生活场景图 → 灌入「生活」池' },
+        { id: 'cockpit', name: '驾驶舱', icon: '舱', status: 'ok', desc: '五星好评 / 人效回库实时盯着 → 新的自动进「点评」「成交」池' },
+        { id: 'audit', name: '审核记录', icon: '拒', status: 'ok', desc: '本周拒掉的已成文 → 灌入「拒审」池' },
+      ],
+    });
+  }
+
+  const pools = [];
+  for (const P of [ZEYU, CENQC]) {
+    for (const def of CONFIG.POOL_DEFS) {
+      pools.push({ projectId: P.id, id: def.id, name: def.name, count: POOL_COUNTS[P.id][def.id], cap: def.cap, ratio: def.ratio });
+    }
+  }
+
+  return {
+    projects,
+    users: USERS,
+    accounts: [...ZEYU_ACCOUNTS, ...CENQC_ACCOUNTS],
+    topics: [...ZEYU_TOPICS, ...CENQC_TOPICS],
+    drafts: [...ZEYU_DRAFTS, ...CENQC_DRAFTS],
+    moments: [],
+    sessions: [...ZEYU_SESSIONS, ...CENQC_SESSIONS],
+    materials: [],
+    course: [...ZEYU_COURSE, ...CENQC_COURSE],
+    pools,
+    audit: [],
+    ledger: LEDGER_SEED,
+    scan_log: SCAN_LOG_SEED,
+    signals: [
+      { projectId: 'p-zeyu', swap: 0, edit: 0, pub: 0 },
+      { projectId: 'p-cenqc', swap: 0, edit: 0, pub: 0 },
+    ],
+    counters: { momentSeq: { 'p-zeyu': 0, 'p-cenqc': 0 } },
+    costs: { byPrompt: {}, byProject: {}, failovers: 0 },
+  };
+}
+
+/** 播种; reset=true 时先清空数据目录 */
+function seedAll(opts) {
+  const reset = !!(opts && opts.reset);
+  const exists = store.get('projects', null);
+  if (!reset && exists && exists.length) return { seeded: false, reset: false };
+  if (reset) store.resetDir();
+  const c = buildCollections();
+  for (const k of Object.keys(c)) store.set(k, c[k]);
+  store.flushAll();
+  return { seeded: true, reset };
+}
+
+if (require.main === module) {
+  const reset = process.argv.includes('--reset');
+  const r = seedAll({ reset });
+  console.log(`[seed] ${r.seeded ? (r.reset ? '已重置并播种' : '已播种') : '数据已存在, 跳过(用 --reset 强制重置)'} → ${CONFIG.DATA_DIR}`);
+  console.log('[seed] 演示账号: admin/admin123 · operator/op123(泽宇) · operator2/op123(岑晴川) · reviewer/rev123 · viewer/view123(只读)');
+}
+
+module.exports = { seedAll, buildCollections, ZEYU, CENQC };

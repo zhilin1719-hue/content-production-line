@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>私域台 · 朋友圈</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  /* ---------- 页面级样式(仅用 var(--xxx) 令牌) ---------- */
+  .low-tip {
+    border-left: 4px solid var(--warn);
+    display: flex; gap: 10px; align-items: flex-start;
+    font: var(--body); color: var(--ink);
+  }
+  .low-tip .tip-badge { flex: none; }
+  .pool-card { cursor: pointer; }
+  .pool-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .gen-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .gen-actions .spacer { flex: 1; }
+  .variant-tag { font: var(--caption); color: var(--muted); align-self: center; }
+  .photo-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .photo-chips .cap-label { font: var(--caption); color: var(--muted); }
+  .big-count { font: 800 34px/1.1 var(--mono); }
+  .hist-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+  .hist-row + .hist-row { border-top: 1px solid var(--rule); }
+  .hist-sum { flex: 1; font: var(--caption); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gen-card.locked { opacity: .82; }
+  .gen-empty { padding: 32px 20px; text-align: center; color: var(--muted); font: var(--body); }
+  .btn-lg { min-height: 44px; padding: 10px 26px; font-size: 15px; }
+</style>
+</head>
+<body>
+<div id="chrome"></div>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">私域台 · 朋友圈</h1>
+      <p class="page-sub">每晚自动学你的口吻，白天随取随发 —— 你只管点一下。</p>
+    </div>
+    <span class="demo-tag">演示数据</span>
+  </div>
+
+  <!-- 1) 流水线区 -->
+  <section class="section" style="margin-top:0" aria-label="生产线流程">
+    <div id="pipeline"></div>
+  </section>
+
+  <!-- 2) 引擎与数据源状态区 -->
+  <section class="section" aria-label="引擎与数据源状态">
+    <div class="section-head">
+      <h2 class="section-title">模块一 · 自动抓取 · 边扫边学</h2>
+      <span class="section-hint">每晚自动跑 · 不用人工投喂</span>
+    </div>
+    <div class="card"><div class="src-list" id="srcList"></div></div>
+  </section>
+
+  <!-- 3) 六池区 -->
+  <section class="section" aria-label="六池水位">
+    <div class="section-head">
+      <h2 class="section-title">六池水位</h2>
+      <span class="section-hint">点击任一池切换取材来源 · 然后「生成今日朋友圈」</span>
+    </div>
+    <div id="lowTip"></div>
+    <div class="pool-grid" id="poolGrid" role="listbox" aria-label="取材池选择"></div>
+  </section>
+
+  <!-- 4) 生成与记账区 -->
+  <section class="section" aria-label="随取随发">
+    <div class="section-head">
+      <h2 class="section-title">随取随发</h2>
+      <span class="section-hint">生成的每一条都按你的声纹写 · 发出去就自动记账</span>
+    </div>
+    <div class="grid-2">
+      <!-- 左列: 生成区 -->
+      <div class="card card-pad col">
+        <div class="row">
+          <button class="btn btn-lg" id="btnGen">生成今日朋友圈</button>
+          <span class="caption muted" style="font:var(--caption);color:var(--muted)" id="sceneCap"></span>
+        </div>
+        <div class="kv" id="mixInfo"></div>
+        <div id="genSlot">
+          <div class="gen-empty">选好池子，点上面那个按钮 —— 文案按你的口吻现写。</div>
+        </div>
+      </div>
+      <!-- 右列: 记账区 -->
+      <div class="col">
+        <div class="card card-pad">
+          <div class="stat-label">今日已发</div>
+          <div class="big-count mono" id="todayCount">0</div>
+          <div class="kv mt8">发一条记一条 · 水位同步扣减</div>
+        </div>
+        <div class="card card-pad grow">
+          <div class="row-between">
+            <span style="font:var(--t3)">已发历史</span>
+            <span class="kv" id="histTotal"></span>
+          </div>
+          <div id="histList" class="mt8"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5) 习惯自适应 -->
+  <section class="section" aria-label="习惯自适应">
+    <div class="section-head">
+      <h2 class="section-title">习惯自适应</h2>
+    </div>
+    <div class="card card-pad">
+      <div class="row-between">
+        <span style="font:var(--t3)">本周学习信号</span>
+        <span class="badge b-info" id="sigTotal"></span>
+      </div>
+      <div class="stat-grid mt16" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card card"><div class="stat-num mono" id="sigSwap">0</div><div class="stat-label">换一换 · 次</div></div>
+        <div class="stat-card card"><div class="stat-num mono" id="sigEdit">0</div><div class="stat-label">修改后发布 · 次</div></div>
+        <div class="stat-card card"><div class="stat-num mono" id="sigPub">0</div><div class="stat-label">标已发 · 条</div></div>
+      </div>
+      <p class="kv mt16">系统每周据此调整取材偏好与文案长度 —— 你换得多的方向，下周少出；你直接发的方向，下周多加。</p>
+    </div>
+  </section>
+
+  <!-- 6) 今日新增素材 -->
+  <section class="section" aria-label="今日新增素材">
+    <div class="section-head">
+      <h2 class="section-title">今日新增素材</h2>
+      <span class="section-hint">昨晚扫描的进账 · 学会了的直接进池</span>
+    </div>
+    <div class="card" id="feedCard"></div>
+  </section>
+
+</main>
+
+<script src="assets/data.js"></script>
+<script src="assets/common.js"></script>
+<script>
+(function () {
+  'use strict';
+  const D = window.CPL_DATA;
+  const esc = CPL.esc;
+
+  /* ---------- 演示日期: 2026-08-21(周五), 按日期区分「今日」 ---------- */
+  const TODAY = '2026-08-21';
+  const WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][new Date(TODAY + 'T00:00:00').getDay()];
+  const SCENE = '工作日 · ' + WD;
+
+  /* ---------- 持久层 key ---------- */
+  const K_POOLS = 'quan.poolCounts';                 // 池水位覆盖层(跨日保留)
+  const K_PUB = 'quan.' + TODAY + '.published';      // 今日已发数
+  const K_HIST = 'quan.' + TODAY + '.history';       // 今日已发历史
+  const K_SIG = 'quan.week.signals';                 // 本周学习信号
+
+  /* ---------- 状态 ---------- */
+  const state = {
+    poolId: 'ganhuo',
+    counts: CPL.store.get(K_POOLS, {}),
+    published: CPL.store.get(K_PUB, 0),
+    history: CPL.store.get(K_HIST, []),
+    signals: CPL.store.get(K_SIG, { swap: 0, edit: 0, pub: 0 }),
+    gen: null,        // 当前生成卡 { text, poolId, variantIdx, variantTotal, goldenUsed, locked }
+    genSeq: 0,        // 生成轮次(决定起始变体)
+  };
+
+  const poolOf = (id) => D.pools.find((p) => p.id === id);
+  const countOf = (id) => (state.counts[id] !== undefined ? state.counts[id] : poolOf(id).count);
+  const saveSignals = () => CPL.store.set(K_SIG, state.signals);
+
+  /* ---------- 1) 流水线 ---------- */
+  const STEPS = [
+    { label: '连库扫描', tip: '每晚自动连上案例库、生活素材库、驾驶舱、审核记录，有新增就拉回来。' },
+    { label: '边扫边学', tip: '扫到的新素材当场拆成可用弹药：案例拆数字，好评抽金句。' },
+    { label: '习惯自适应', tip: '你每次「换一换」和「直接发」都被记下来，下周的取材偏好跟着你变。' },
+    { label: '六池灌溉', tip: '学会的素材按类型灌进六个池子，水位一眼看得见，见底会提前喊你。' },
+    { label: '随取随发 · 记账', tip: '点一下就按你的声纹出一条，发出去自动记账、水位同步扣减。' },
+  ];
+  document.getElementById('pipeline').innerHTML = CPL.pipeline(STEPS, 4);
+  CPL.$$('#pipeline .pipe-step').forEach((b) => {
+    b.onclick = () => {
+      const i = +b.dataset.step;
+      CPL.openModal(`
+        <div class="modal-head">
+          <div><div class="modal-title">第 ${i + 1} 步 · ${esc(STEPS[i].label)}</div>
+          <div class="modal-sub">这一步干什么，一句人话</div></div>
+          <button class="modal-x" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body"><p style="line-height:1.9">${esc(STEPS[i].tip)}</p></div>`);
+    };
+  });
+
+  /* ---------- 2) 五源状态 ---------- */
+  document.getElementById('srcList').innerHTML = D.sources.map((s) => `
+    <div class="src-row">
+      <span class="src-icon">${esc(s.icon)}</span>
+      <span class="src-name">${esc(s.name)}</span>
+      <span class="src-desc">${esc(s.desc)}</span>
+      ${s.id === 'voice' ? '<span class="likeness">像你度 <b>97.2%</b></span>' : ''}
+      <span class="badge b-success">已就绪</span>
+    </div>`).join('');
+
+  /* ---------- 3) 六池 ---------- */
+  function renderPools() {
+    document.getElementById('poolGrid').innerHTML = D.pools.map((p) => {
+      const c = countOf(p.id);
+      const pct = Math.round((c / p.cap) * 100);
+      const low = pct < 20;
+      return `<button class="pool-card ${low ? 'low' : ''} ${state.poolId === p.id ? 'on' : ''}"
+          role="option" aria-selected="${state.poolId === p.id}" data-pool="${p.id}">
+        <span class="pool-name">${esc(p.name)}池</span>
+        <span class="pool-count">${c}<small>/ ${p.cap} 条</small></span>
+        <span class="pool-pct">水位 ${pct}%${low ? ' · 见底' : ''}</span>
+        <span class="pool-bar"><i style="width:${Math.max(pct, 2)}%"></i></span>
+      </button>`;
+    }).join('');
+    CPL.$$('#poolGrid .pool-card').forEach((el) => {
+      el.onclick = () => {
+        state.poolId = el.dataset.pool;
+        state.gen = null;
+        renderPools(); renderLowTip(); renderMix(); renderGenSlot();
+        CPL.toast(`已切到「${poolOf(state.poolId).name}池」取材 —— 再点「生成今日朋友圈」`);
+      };
+    });
+  }
+  function renderLowTip() {
+    const lows = D.pools.filter((p) => countOf(p.id) / p.cap < 0.2);
+    const box = document.getElementById('lowTip');
+    if (!lows.length) { box.innerHTML = ''; return; }
+    const msgs = lows.map((p) => p.id === 'jushen'
+      ? '拒审池见底：本周有 3 位被拒客户已成文，可直接生成。'
+      : `${p.name}池见底：只剩 ${countOf(p.id)} 条，今晚扫描后自动补料，先发别的池不耽误。`);
+    box.innerHTML = `<div class="card card-pad low-tip" style="margin-bottom:12px">
+      <span class="badge b-warn tip-badge">水位提醒</span><span>${msgs.map(esc).join('<br>')}</span>
+    </div>`;
+  }
+
+  /* ---------- 4) 生成与记账 ---------- */
+  const RATIO = D.pools.map((p) => p.name + p.ratio).join('/');
+  function renderMix() {
+    document.getElementById('mixInfo').innerHTML =
+      `当前取材：<b>${esc(poolOf(state.poolId).name)}池</b> · 配比 ${esc(RATIO)}`;
+  }
+  document.getElementById('sceneCap').textContent = SCENE;
+
+  function renderGenSlot() {
+    const slot = document.getElementById('genSlot');
+    const g = state.gen;
+    if (!g) {
+      slot.innerHTML = '<div class="gen-empty">选好池子，点上面那个按钮 —— 文案按你的口吻现写。</div>';
+      return;
+    }
+    const pool = poolOf(g.poolId);
+    const like = CPL.likeness(g.text);
+    slot.innerHTML = `
+      <div class="card gen-card ${g.locked ? 'locked' : ''}">
+        <div class="gen-text">${esc(g.text)}</div>
+        ${g.poolId === 'shenghuo' ? `
+        <div class="photo-chips">
+          <span class="cap-label">配图推荐：</span>
+          ${D.photoSuggests.map((p) => `<span class="badge b-info">${esc(p)}</span>`).join('')}
+        </div>` : ''}
+        <div class="gen-meta">
+          <span class="likeness">像你度 <b>${like.toFixed(1)}%</b></span>
+          <span class="badge b-topic">${esc(pool.name)}池</span>
+          ${g.locked ? '<span class="badge b-pub">已发</span>' : ''}
+        </div>
+        <div class="gen-actions">
+          <button class="btn btn-ghost" id="actSwap" ${g.locked ? 'disabled' : ''}>换一换</button>
+          <span class="variant-tag">变体 ${g.variantIdx + 1}/${g.variantTotal}</span>
+          <button class="btn btn-ghost" id="actGolden" ${(g.locked || g.goldenUsed) ? 'disabled' : ''}>${g.goldenUsed ? '金句已植入 ✓' : '金句植入'}</button>
+          <button class="btn btn-ghost" id="actCopy">复制文案</button>
+          <span class="spacer"></span>
+          <button class="btn" id="actPub" ${g.locked ? 'disabled' : ''}>${g.locked ? '已发 ✓' : '标已发'}</button>
+        </div>
+      </div>`;
+
+    CPL.$('#actCopy', slot).onclick = (e) => CPL.copyText(g.text, e.currentTarget);
+
+    const btnSwap = CPL.$('#actSwap', slot);
+    if (btnSwap && !g.locked) btnSwap.onclick = () => {
+      g.variantIdx = (g.variantIdx + 1) % g.variantTotal;
+      g.text = D.moments[g.poolId][g.variantIdx];
+      g.goldenUsed = false;
+      state.signals.swap++; saveSignals(); renderSignals();
+      CPL.toast('换过已记入学习信号 —— 下周这个方向少出');
+      renderGenSlot();
+    };
+
+    const btnGolden = CPL.$('#actGolden', slot);
+    if (btnGolden && !g.locked && !g.goldenUsed) btnGolden.onclick = () => {
+      const line = D.golden[Math.floor(Math.random() * D.golden.length)];
+      g.text = g.text + '\n\n' + line;
+      g.goldenUsed = true;
+      CPL.toast('金句已加到文案末尾 —— 这条算「修改后发布」');
+      renderGenSlot();
+    };
+
+    const btnPub = CPL.$('#actPub', slot);
+    if (btnPub && !g.locked) btnPub.onclick = () => {
+      const c = countOf(g.poolId) - 1;
+      if (!CPL.markPublished(btnPub, `已发 ✓ 记账完成 · ${pool.name}池水位 -1（剩 ${c} 条）`)) return;
+      state.counts[g.poolId] = c; CPL.store.set(K_POOLS, state.counts);
+      state.published++; CPL.store.set(K_PUB, state.published);
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0'), mm = String(now.getMinutes()).padStart(2, '0');
+      state.history.unshift({ time: `今天 ${hh}:${mm}`, text: g.text.replace(/\s+/g, ' ').slice(0, 40) + '……', pool: pool.name });
+      CPL.store.set(K_HIST, state.history);
+      state.signals.pub++;
+      if (g.goldenUsed) state.signals.edit++;
+      saveSignals();
+      g.locked = true;
+      renderPools(); renderLowTip(); renderLedger(); renderSignals(); renderGenSlot();
+    };
+  }
+
+  CPL.$('#btnGen').onclick = (e) => {
+    const btn = e.currentTarget;
+    CPL.withLoading(btn, '生成中…', (done) => {
+      setTimeout(() => {
+        const poolId = state.poolId;
+        const variants = D.moments[poolId];
+        const idx = state.genSeq % variants.length;
+        state.genSeq++;
+        state.gen = { poolId, variantIdx: idx, variantTotal: variants.length, text: variants[idx], goldenUsed: false, locked: false };
+        /* 像你度 <90% 自动重生一次(NFR-17) */
+        if (CPL.likeness(state.gen.text) < 90) {
+          state.gen.variantIdx = (idx + 1) % variants.length;
+          state.gen.text = variants[state.gen.variantIdx];
+          CPL.toast('像你度未达 90%，已自动重生一次', false);
+        }
+        done();
+        renderGenSlot();
+      }, 1500);
+    });
+  };
+
+  /* ---------- 记账区 ---------- */
+  function renderLedger() {
+    document.getElementById('todayCount').textContent = state.published;
+    const all = state.history.concat(D.publishedInit);
+    document.getElementById('histTotal').textContent = `共 ${all.length} 条`;
+    document.getElementById('histList').innerHTML = all.map((h) => `
+      <div class="hist-row">
+        <span class="kv" style="flex:none"><b>${esc(h.time)}</b></span>
+        <span class="hist-sum" title="${esc(h.text)}">${esc(h.text)}</span>
+        <span class="badge b-topic">${esc(h.pool)}</span>
+      </div>`).join('');
+  }
+
+  /* ---------- 5) 学习信号 ---------- */
+  function renderSignals() {
+    document.getElementById('sigSwap').textContent = state.signals.swap;
+    document.getElementById('sigEdit').textContent = state.signals.edit;
+    document.getElementById('sigPub').textContent = state.signals.pub;
+    document.getElementById('sigTotal').textContent = `本周共 ${state.signals.swap + state.signals.edit + state.signals.pub} 个信号`;
+  }
+
+  /* ---------- 6) 今日新增素材 ---------- */
+  document.getElementById('feedCard').innerHTML = D.todayFeed.map((f) => `
+    <div class="feed-item">
+      <span class="feed-src">${esc(f.src)}</span>
+      <span class="feed-body">${f.html}</span>
+      <span class="badge ${f.state === 'learned' ? 'b-success' : 'b-scanning'}">${f.state === 'learned' ? '已学会' : '扫描中'}</span>
+    </div>`).join('');
+
+  /* ---------- 首屏 ---------- */
+  renderPools(); renderLowTip(); renderMix(); renderGenSlot(); renderLedger(); renderSignals();
+  CPL.renderChrome('quan');
+})();
+</script>
+</body>
+</html>

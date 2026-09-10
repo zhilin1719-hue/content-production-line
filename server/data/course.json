@@ -1,0 +1,79 @@
+[
+ {
+  "id": "c-s1-1",
+  "projectId": "p-zeyu",
+  "sessionId": "s1",
+  "day": 1,
+  "theme": "财富赛道从百万到千万的三层地图: 你专业这么强, 为什么卡在百万?",
+  "hook": "《高净值变现路线图》",
+  "caseRef": "",
+  "status": "已发",
+  "photos": 3
+ },
+ {
+  "id": "c-s1-2",
+  "projectId": "p-zeyu",
+  "sessionId": "s1",
+  "day": 2,
+  "theme": "第一把钥匙: 换人群 —— 把同一身专业, 卖给付得起的高净值",
+  "hook": "《报价 10 倍手册》",
+  "caseRef": "案例: 李笑来",
+  "status": "已发",
+  "photos": 3
+ },
+ {
+  "id": "c-s1-3",
+  "projectId": "p-zeyu",
+  "sessionId": "s1",
+  "day": 3,
+  "theme": "第二把钥匙: 把「卖专业」升级成「卖结果」 —— 高客单顾问产品怎么设计",
+  "hook": "《顾问式成交手册》",
+  "caseRef": "案例: 古典",
+  "status": "已发",
+  "photos": 3
+ },
+ {
+  "id": "c-s1-4",
+  "projectId": "p-zeyu",
+  "sessionId": "s1",
+  "day": 4,
+  "theme": "第三把钥匙: 标准化 SOP + 搭团队 —— 从一个人累死, 到业务自运转",
+  "hook": "《进化一把手》",
+  "caseRef": "案例: 张一鸣",
+  "status": "已发",
+  "photos": 0
+ },
+ {
+  "id": "c-s1-5",
+  "projectId": "p-zeyu",
+  "sessionId": "s1",
+  "day": 5,
+  "theme": "一对一帮你把这套用到你自己的专业上",
+  "hook": "一对一环节",
+  "caseRef": "",
+  "status": "未发",
+  "photos": 0
+ },
+ {
+  "id": "c-s3-5",
+  "projectId": "p-zeyu",
+  "sessionId": "s3",
+  "day": 5,
+  "theme": "一对一帮你把定位收窄用到自己的赛道上",
+  "hook": "一对一环节",
+  "caseRef": "",
+  "status": "未发",
+  "photos": 0
+ },
+ {
+  "id": "c-sc1-5",
+  "projectId": "p-cenqc",
+  "sessionId": "sc1",
+  "day": 5,
+  "theme": "一对一帮你把全案报价用到自己的客户上",
+  "hook": "一对一环节",
+  "caseRef": "",
+  "status": "未发",
+  "photos": 0
+ }
+]

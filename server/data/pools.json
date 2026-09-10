@@ -1,0 +1,98 @@
+[
+ {
+  "projectId": "p-zeyu",
+  "id": "ganhuo",
+  "name": "干货",
+  "count": 34,
+  "cap": 40,
+  "ratio": 30
+ },
+ {
+  "projectId": "p-zeyu",
+  "id": "anli",
+  "name": "案例",
+  "count": 18,
+  "cap": 30,
+  "ratio": 20
+ },
+ {
+  "projectId": "p-zeyu",
+  "id": "shenghuo",
+  "name": "生活",
+  "count": 22,
+  "cap": 30,
+  "ratio": 20
+ },
+ {
+  "projectId": "p-zeyu",
+  "id": "dianping",
+  "name": "点评",
+  "count": 9,
+  "cap": 25,
+  "ratio": 15
+ },
+ {
+  "projectId": "p-zeyu",
+  "id": "chengjiao",
+  "name": "成交",
+  "count": 12,
+  "cap": 20,
+  "ratio": 10
+ },
+ {
+  "projectId": "p-zeyu",
+  "id": "jushen",
+  "name": "拒审",
+  "count": 4,
+  "cap": 15,
+  "ratio": 5
+ },
+ {
+  "projectId": "p-cenqc",
+  "id": "ganhuo",
+  "name": "干货",
+  "count": 21,
+  "cap": 40,
+  "ratio": 30
+ },
+ {
+  "projectId": "p-cenqc",
+  "id": "anli",
+  "name": "案例",
+  "count": 14,
+  "cap": 30,
+  "ratio": 20
+ },
+ {
+  "projectId": "p-cenqc",
+  "id": "shenghuo",
+  "name": "生活",
+  "count": 16,
+  "cap": 30,
+  "ratio": 20
+ },
+ {
+  "projectId": "p-cenqc",
+  "id": "dianping",
+  "name": "点评",
+  "count": 7,
+  "cap": 25,
+  "ratio": 15
+ },
+ {
+  "projectId": "p-cenqc",
+  "id": "chengjiao",
+  "name": "成交",
+  "count": 6,
+  "cap": 20,
+  "ratio": 10
+ },
+ {
+  "projectId": "p-cenqc",
+  "id": "jushen",
+  "name": "拒审",
+  "count": 3,
+  "cap": 15,
+  "ratio": 5
+ }
+]

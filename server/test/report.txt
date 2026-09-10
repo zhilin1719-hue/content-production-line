@@ -1,0 +1,13 @@
+﻿流量总台·内容生产线 — 后端测试报告
+生成时间: 2026-09-10 21:47:32
+运行时: Node v22 (ELECTRON_RUN_AS_NODE) / node:test
+
+engines         31 tests  pass  31  fail 0  252.7684ms
+statemachine    12 tests  pass  12  fail 0  208.7424ms
+llm              7 tests  pass   7  fail 0  268.2118ms
+isolation        6 tests  pass   6  fail 0  415.7564ms
+api             17 tests  pass  17  fail 0  786.1349ms
+
+TOTAL: 73 tests, pass 73, fail 0
+
+覆盖: 引擎(合规变体拦截/原创度边界/像你度确定性/节奏推演/撞期) 状态机(表驱动穷举) LLM网关(主备切换/token记账) 多项目隔离(跨项目404/越权口径) API全链路(出稿四步/合规三层/幂等409/撞期422/角色403)

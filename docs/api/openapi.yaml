@@ -1,0 +1,2352 @@
+openapi: 3.1.0
+info:
+  title: 流量总台 · 内容生产线 API
+  version: 1.0.0
+  description: |
+    「流量总台 · 内容生产线」后端接口契约（交付物 D3，OpenAPI 3.1）。
+
+    覆盖三大模块：
+    - 公域台（盯对标 → 换理念 → 出稿 → 三层合规 → 交接剪辑）
+    - 私域台 · 朋友圈（五源连库扫描 → 边扫边学 → 六池水位 → 随取随发记账）
+    - 私域台 · 公开课（场次 → 预热三渠道物料 → 正课 5 天 → 排期泳道）
+
+    生成类能力由 llm-gateway 承接，提示词契约见 docs/prompts/P-01 ~ P-08
+    （文件内 {{变量}} 为占位符，由网关渲染后调用模型；对应关系见各端点的 x-llm-prompt 扩展字段）。
+
+    全局约定：
+    - 认证：除 /api/auth/login 与 /api/health 外，均需 Bearer Token（JWT）。
+    - 数据隔离：所有业务资源按项目（project）隔离，理念库、声纹、六池互不串用。
+    - 生成类 POST（ideas / frame / compliance / review / course generate 等）返回 200；
+      创建持久资源的 POST（projects / accounts / sessions / moments generate / topics draft）返回 201。
+    - 409 用于幂等重复发布（ALREADY_PUBLISHED）与状态机不允许的操作（INVALID_STATE）。
+    - 422 用于参数校验失败（VALIDATION_FAILED）与场次正课期撞期（SCHEDULE_CONFLICT）。
+    - 列表接口按赞数 / 时间倒序分页，page 从 1 起，pageSize 默认 20、最大 100。
+    - 演示数据基线：app/assets/data.js；合规 / 原创度 / 像你度语义见 app/assets/common.js。
+servers:
+  - url: https://api.liuliangzongtai.com
+    description: 生产环境
+  - url: https://staging-api.liuliangzongtai.com
+    description: 预发环境
+  - url: http://localhost:8080
+    description: 本地开发
+security:
+  - BearerAuth: []
+tags:
+  - name: auth
+    description: 认证与当前用户
+  - name: accounts
+    description: 公域台 · 对标账号（添加 / 开盯 / 暂停 / 扫描）
+  - name: topics
+    description: 公域台 · 选题池（筛选 / 淘汰 / 恢复）
+  - name: drafts
+    description: 公域台 · 出稿工作台（理念三选一、框架二选一、初稿、三层合规、导出）
+  - name: moments
+    description: 私域台 · 朋友圈（五源、六池、生成、换一换、发布记账）
+  - name: sessions
+    description: 私域台 · 公开课（场次、预热物料、正课、配图）
+  - name: common
+    description: 项目、总台看板、审计流水、成本报表、健康检查
+paths:
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: 登录，签发 Bearer 访问令牌
+      operationId: authLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              ok:
+                value:
+                  username: cpl_operator
+                  password: secret123
+      responses:
+        '200':
+          description: 登录成功，返回令牌与用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 用户名或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                badCredentials:
+                  value:
+                    error:
+                      code: UNAUTHORIZED
+                      message: 用户名或密码错误
+                      hint: 连续 5 次失败将锁定 10 分钟，请检查后重试
+  /api/auth/me:
+    get:
+      tags: [auth]
+      summary: 获取当前登录用户与项目上下文
+      operationId: authMe
+      responses:
+        '200':
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/projects:
+    get:
+      tags: [common]
+      summary: 项目列表（多项目隔离，理念库 / 声纹 / 六池互不串用）
+      operationId: listProjects
+      responses:
+        '200':
+          description: 当前用户可见的项目列表
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [common]
+      summary: 新建项目
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 30
+                  description: 项目名，如「岑晴川 · 别墅设计」
+      responses:
+        '201':
+          description: 项目已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: 参数校验失败（名称为空或超长）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/accounts:
+    get:
+      tags: [accounts]
+      summary: 对标账号列表（名称自动脱敏展示）
+      operationId: listAccounts
+      responses:
+        '200':
+          description: 当前项目在盯 / 已暂停的对标账号
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Account'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [accounts]
+      summary: 添加对标账号并直接开盯（触发首轮扫描）
+      operationId: createAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountCreate'
+            examples:
+              ok:
+                value:
+                  full: 商业巫师笔记
+                  platform: 抖音
+                  track: 商业IP赛道
+                  fans: 120000
+                  works: 48
+      responses:
+        '201':
+          description: 账号已添加并开盯，首轮扫描 10 分钟内完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: 参数校验失败（平台不在支持范围、粉丝数为负等）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/accounts/{id}:
+    patch:
+      tags: [accounts]
+      summary: 开盯 / 暂停盯一个对标账号
+      operationId: updateAccountWatch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 账号 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [watching]
+              properties:
+                watching:
+                  type: boolean
+                  description: true=开盯（暂停期间的新爆款不进池，恢复后自动扫描）；false=暂停
+      responses:
+        '200':
+          description: 已更新盯盯状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/accounts/{id}/scan:
+    post:
+      tags: [accounts]
+      summary: 手动触发一次对标扫描（赞数跑赢且挂得上理念的自动进选题池）
+      operationId: scanAccount
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 账号 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 扫描任务已启动（异步），结果陆续进选题池
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 账号处于暂停状态，不可手动扫描
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                paused:
+                  value:
+                    error:
+                      code: INVALID_STATE
+                      message: 账号已暂停，暂停期间不扫描
+                      hint: 先调用 PATCH /api/accounts/{id} 开盯，再触发扫描
+  /api/topics:
+    get:
+      tags: [topics]
+      summary: 选题池列表（按赞数倒序分页）
+      operationId: listTopics
+      parameters:
+        - name: status
+          in: query
+          description: 按状态筛选；不传时返回 选题 / 已出稿 / 已淘汰，显式传「已筛除」可查自动筛除留痕
+          schema:
+            enum:
+              - 选题
+              - 已出稿
+              - 已淘汰
+              - 已筛除
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: 选题池分页列表与本周扫描汇总
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, pageSize, total, summary]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Topic'
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  total:
+                    type: integer
+                  summary:
+                    type: object
+                    description: 本周扫描汇总条
+                    required: [scanned, pooled, filtered]
+                    properties:
+                      scanned:
+                        type: integer
+                        description: 新增扫描条数
+                      pooled:
+                        type: integer
+                        description: 入池条数
+                      filtered:
+                        type: integer
+                        description: 挂不上钩自动筛除条数（留痕）
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/topics/{id}/discard:
+    post:
+      tags: [topics]
+      summary: 淘汰选题（移入已淘汰，保留 90 天可恢复）
+      operationId: discardTopic
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 选题 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已淘汰（对已淘汰选题重复调用为幂等，直接返回原状态）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 当前状态不允许淘汰
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                drafted:
+                  value:
+                    error:
+                      code: INVALID_STATE
+                      message: 已出稿的选题不可淘汰
+                      hint: 已出稿选题仅支持查看与导出
+  /api/topics/{id}/restore:
+    post:
+      tags: [topics]
+      summary: 恢复已淘汰选题（90 天内有效，恢复后回到选题池可继续出稿）
+      operationId: restoreTopic
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 选题 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已恢复，状态回到「选题」
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 不可恢复（非已淘汰状态，或超过 90 天保留期已被清除）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                expired:
+                  value:
+                    error:
+                      code: RESTORE_EXPIRED
+                      message: 超过 90 天保留期，该选题已自动清除
+                      hint: 已淘汰选题保留 90 天，请在保留期内恢复
+  /api/topics/{id}/ideas:
+    post:
+      tags: [drafts]
+      summary: 理念选题三选一 —— 生成 3 个换理念改编方向
+      operationId: generateIdeas
+      x-llm-prompt: P-01
+      description: 出稿工作台第 1 步。同一条爆款用我方理念库换三个角度；重复调用即「重新生成」。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 选题 ID
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                excludeTags:
+                  type: array
+                  items:
+                    type: string
+                  description: 重新生成时排除上一轮已出现的方向标签，保证三选一有新意
+      responses:
+        '200':
+          description: 3 个改编方向（tag / title / desc）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [topicId, options]
+                properties:
+                  topicId:
+                    type: string
+                  options:
+                    type: array
+                    minItems: 3
+                    maxItems: 3
+                    items:
+                      $ref: '#/components/schemas/IdeaOption'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/topics/{id}/frame:
+    post:
+      tags: [drafts]
+      summary: 框架二选一 —— 基于已选理念生成 2 套内容框架
+      operationId: generateFrames
+      x-llm-prompt: P-02
+      description: 出稿工作台第 2 步。固定输出两套骨架：冲突递进（钩子→冲突→展开→收尾）与案例实证（案例开场→拆解→迁移→行动指令）。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 选题 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ideaIndex]
+              properties:
+                ideaIndex:
+                  type: integer
+                  minimum: 0
+                  maximum: 2
+                  description: 第 1 步选定的理念方向下标（0~2）
+      responses:
+        '200':
+          description: 2 套框架（tag / title / desc）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [topicId, ideaIndex, options]
+                properties:
+                  topicId:
+                    type: string
+                  ideaIndex:
+                    type: integer
+                  options:
+                    type: array
+                    minItems: 2
+                    maxItems: 2
+                    items:
+                      $ref: '#/components/schemas/FrameOption'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: ideaIndex 超出 0~2 或该选题尚未生成理念方向
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/topics/{id}/draft:
+    post:
+      tags: [drafts]
+      summary: 按理念 + 框架 + 声纹生成口播初稿（300~500 字）
+      operationId: generateDraft
+      x-llm-prompt: P-03
+      description: 出稿工作台第 3 步。像你度低于 90% 不出稿，服务端自动重生一次再复检（NFR-17）。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 选题 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ideaIndex, frameIndex]
+              properties:
+                ideaIndex:
+                  type: integer
+                  minimum: 0
+                  maximum: 2
+                frameIndex:
+                  type: integer
+                  minimum: 0
+                  maximum: 1
+                  description: 0=框架 A 冲突递进，1=框架 B 案例实证
+      responses:
+        '201':
+          description: 初稿已生成并持久化
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draft'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: 理念 / 框架下标非法
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/drafts/{id}/compliance:
+    post:
+      tags: [drafts]
+      summary: 合规第一层 —— 规则库扫描（广告法极限词 / 承诺性表述）
+      operationId: runComplianceScan
+      description: 对初稿做字面规则扫描，返回命中明细（词、类型、修复建议、次数）。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 初稿 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 第一层扫描结果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draftId, layer, hits, totalHits, passed]
+                properties:
+                  draftId:
+                    type: string
+                  layer:
+                    type: integer
+                    const: 1
+                  hits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ComplianceHit'
+                  totalHits:
+                    type: integer
+                    description: 命中总处数（按出现次数累计）
+                  passed:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/drafts/{id}/apply-fixes:
+    post:
+      tags: [drafts]
+      summary: 采纳第一层修复建议（全部采纳或指定词），并自动重扫
+      operationId: applyComplianceFixes
+      description: 例如「最好 → 更适合大多数人」「第一 → 头部」；改动同步进入学习信号。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 初稿 ID
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                words:
+                  type: array
+                  items:
+                    type: string
+                  description: 仅采纳指定风险词；缺省采纳全部建议
+      responses:
+        '200':
+          description: 已替换并完成重扫
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draft, replaced, rescan]
+                properties:
+                  draft:
+                    $ref: '#/components/schemas/Draft'
+                  replaced:
+                    type: array
+                    items:
+                      type: object
+                      required: [from, to]
+                      properties:
+                        from:
+                          type: string
+                          description: 被替换的风险词
+                        to:
+                          type: string
+                          description: 替换后的表述
+                  rescan:
+                    type: object
+                    required: [totalHits, passed]
+                    properties:
+                      totalHits:
+                        type: integer
+                      passed:
+                        type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 初稿已终审锁定，不可再修改
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/drafts/{id}/review:
+    post:
+      tags: [drafts]
+      summary: 合规第二层 —— 大模型语义复核 + 原创度检测
+      operationId: reviewCompliance
+      x-llm-prompt: P-07
+      description: 原创度按与对标原文连续 8 字重合率计算，≤ 15% 通过；语义复核重点为承诺收益、制造焦虑、极限词变体。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 初稿 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 第二层复核结果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draftId, layer, originality, semanticRisks, passed, reason]
+                properties:
+                  draftId:
+                    type: string
+                  layer:
+                    type: integer
+                    const: 2
+                  originality:
+                    type: object
+                    required: [overlapPct, threshold, passed]
+                    properties:
+                      overlapPct:
+                        $ref: '#/components/schemas/OverlapPct'
+                      threshold:
+                        type: number
+                        const: 15
+                      passed:
+                        type: boolean
+                  semanticRisks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RiskItem'
+                  passed:
+                    type: boolean
+                    description: 第二层整体是否通过（原创度达标且语义风险为空）
+                  reason:
+                    type: string
+                    description: 一句话结论，如「连续 8 字重合率 9.8%，未发现语义风险」
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/drafts/{id}/final-review:
+    post:
+      tags: [drafts]
+      summary: 合规第三层 —— 人工终审（通过即标记合规过审版，选题转已出稿）
+      operationId: finalReview
+      description: 三层全过，这篇稿子才允许进剪辑队列；打回则回到初稿编辑态。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 初稿 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approve]
+              properties:
+                approve:
+                  type: boolean
+                  description: true=终审通过并归档；false=打回修改
+                comment:
+                  type: string
+                  maxLength: 200
+                  description: 打回原因或终审备注（进审计流水）
+      responses:
+        '200':
+          description: 终审结果（通过→合规过审版；打回→已打回）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draft'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 第一层或第二层未通过时不可终审
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                layerPending:
+                  value:
+                    error:
+                      code: INVALID_STATE
+                      message: 第一 / 二层尚未通过，不可人工终审
+                      hint: 先采纳修复建议并通过第二层复核，再回来拍板
+  /api/drafts/{id}/export:
+    get:
+      tags: [drafts]
+      summary: 导出合规过审版口播稿 .txt（直接交接剪辑）
+      operationId: exportDraft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 初稿 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 口播稿纯文本文件
+          headers:
+            Content-Disposition:
+              description: 附件文件名，如 attachment; filename="口播稿-低客单不是引流.txt"
+              schema:
+                type: string
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 未取得合规过审版，不可导出
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                notApproved:
+                  value:
+                    error:
+                      code: INVALID_STATE
+                      message: 仅合规过审版可导出
+                      hint: 三层全过后自动获得导出资格
+  /api/sources:
+    get:
+      tags: [moments]
+      summary: 朋友圈五源状态（声纹引擎 / 案例库 / 生活素材库 / 驾驶舱 / 审核记录）
+      operationId: listSources
+      responses:
+        '200':
+          description: 五源连接与就绪状态
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Source'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/pools:
+    get:
+      tags: [moments]
+      summary: 六池水位（干货 / 案例 / 生活 / 点评 / 成交 / 拒审）
+      operationId: listPools
+      responses:
+        '200':
+          description: 六池水位与配比
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, ratioSummary]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Pool'
+                  ratioSummary:
+                    type: string
+                    description: 取材配比汇总，如「干货30/案例20/生活20/点评15/成交10/拒审5」
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/moments/generate:
+    post:
+      tags: [moments]
+      summary: 生成今日朋友圈（按池归属 + 当日场景 + 声纹，80~150 字）
+      operationId: generateMoment
+      x-llm-prompt: P-04
+      description: 像你度低于 90% 自动重生一次（NFR-17）；生活池附配图推荐。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [poolId]
+              properties:
+                poolId:
+                  $ref: '#/components/schemas/PoolId'
+                scene:
+                  type: string
+                  description: 当日场景；缺省由服务端按日期推导
+                  examples:
+                    - 工作日 · 周五
+                withGolden:
+                  type: boolean
+                  default: false
+                  description: 是否在文案末尾植入一条金句（计入「修改后发布」学习信号）
+      responses:
+        '201':
+          description: 朋友圈文案已生成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Moment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: poolId 非法或该池水位为 0
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                emptyPool:
+                  value:
+                    error:
+                      code: VALIDATION_FAILED
+                      message: 拒审池当前为空
+                      hint: 今晚扫描后自动补料，先发别的池不耽误
+  /api/moments/{id}/swap:
+    post:
+      tags: [moments]
+      summary: 换一换（切换下一变体，记入学习信号，下周该方向少出）
+      operationId: swapMoment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 朋友圈文案 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已切换到下一变体
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Moment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 已发条目锁定，不可换
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                locked:
+                  value:
+                    error:
+                      code: INVALID_STATE
+                      message: 已发条目不可换一换
+                      hint: 请生成新的一条
+  /api/moments/{id}/publish:
+    post:
+      tags: [moments]
+      summary: 标已发（发布记账：池水位 -1、已发历史 +1、学习信号回写）
+      operationId: publishMoment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 朋友圈文案 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 已记入发布记账，水位与进度已回写
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [moment, pool, todayPublished]
+                properties:
+                  moment:
+                    $ref: '#/components/schemas/Moment'
+                  pool:
+                    $ref: '#/components/schemas/Pool'
+                  todayPublished:
+                    type: integer
+                    description: 今日已发条数（含本条）
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 幂等重复发布 —— 该条已标记已发
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                alreadyPublished:
+                  value:
+                    error:
+                      code: ALREADY_PUBLISHED
+                      message: 该条朋友圈已标记已发
+                      hint: 已发条目锁定，请生成新的一条
+  /api/sessions:
+    get:
+      tags: [sessions]
+      summary: 公开课场次列表（每场为预热 3 天 + 正课 5 天）
+      operationId: listSessions
+      responses:
+        '200':
+          description: 当前项目全部场次（含在跑、已收官、已中止）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [sessions]
+      summary: 新建场次（开课日 = 预热开始日 + 3，正课期撞期会被拦下）
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreate'
+            examples:
+              ok:
+                value:
+                  title: '有流量, 却卡在变现: 博主突破千万的私域成交系统课'
+                  audience: 百万粉丝、月入不过万的博主
+                  hook: 高净值变现路线图
+                  warmStart: '2026-08-21'
+      responses:
+        '201':
+          description: 场次已建，物料将于预热日早 8 点前就绪
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: 参数校验失败或与在跑场次正课期撞期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                scheduleClash:
+                  value:
+                    error:
+                      code: SCHEDULE_CONFLICT
+                      message: 与『从百万到千万』正课期 08-06 至 08-10 撞期
+                      hint: 把预热开始日挪开再建
+                tooLong:
+                  value:
+                    error:
+                      code: VALIDATION_FAILED
+                      message: 课程主题超 40 字
+                      hint: 收一收，控制在 40 字内
+  /api/sessions/{id}/materials/{day}/{channel}/swap:
+    post:
+      tags: [sessions]
+      summary: 预热物料换一换（切下一变体，记入学习信号）
+      operationId: swapMaterial
+      x-llm-prompt: P-04/P-05
+      description: 三渠道物料各维护 3 个变体循环；换过的方向下周更贴操盘手挑中的那条。dm 渠道文案含 {{称呼}} 占位符。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 场次 ID
+          schema:
+            type: string
+        - name: day
+          in: path
+          required: true
+          description: 预热日
+          schema:
+            $ref: '#/components/schemas/WarmDay'
+        - name: channel
+          in: path
+          required: true
+          description: 渠道
+          schema:
+            $ref: '#/components/schemas/Channel'
+      responses:
+        '200':
+          description: 已切换到下一变体
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Material'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 该渠道物料已发，锁定不可换
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                locked:
+                  value:
+                    error:
+                      code: INVALID_STATE
+                      message: 已发物料不可换一换
+                      hint: 每渠道每日只发一条
+  /api/sessions/{id}/materials/{day}/{channel}/publish:
+    post:
+      tags: [sessions]
+      summary: 预热物料标已发（发布记账，本日进度 x/3 回写）
+      operationId: publishMaterial
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 场次 ID
+          schema:
+            type: string
+        - name: day
+          in: path
+          required: true
+          description: 预热日
+          schema:
+            $ref: '#/components/schemas/WarmDay'
+        - name: channel
+          in: path
+          required: true
+          description: 渠道
+          schema:
+            $ref: '#/components/schemas/Channel'
+      responses:
+        '200':
+          description: 已记入发布记账
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [material, publishedCount, total]
+                properties:
+                  material:
+                    $ref: '#/components/schemas/Material'
+                  publishedCount:
+                    type: integer
+                    description: 该预热日已发渠道数（0~3）
+                  total:
+                    type: integer
+                    const: 3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 幂等重复发布 —— 该渠道当日已标已发
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                alreadyPublished:
+                  value:
+                    error:
+                      code: ALREADY_PUBLISHED
+                      message: 该渠道当日物料已标记已发
+                      hint: 每渠道每日一条，请换到其他渠道或次日再发
+  /api/sessions/{id}/course:
+    get:
+      tags: [sessions]
+      summary: 正课 5 天课表（主题 / 钩子文件 / 参考案例 / 状态 / 配图）
+      operationId: getCourse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 场次 ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 正课课表与发布进度
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, publishedCount, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CourseDay'
+                  publishedCount:
+                    type: integer
+                    description: 已发天数（0~5）
+                  total:
+                    type: integer
+                    const: 5
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/sessions/{id}/course/{day}/generate:
+    post:
+      tags: [sessions]
+      summary: 生成正课正文（800~1200 字，含行动指令与作业）
+      operationId: generateCourseContent
+      x-llm-prompt: P-06
+      description: 按天主题 + 钩子文件 + 参考案例生成；生成后仍为「未发」，标已发才回写进度。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 场次 ID
+          schema:
+            type: string
+        - name: day
+          in: path
+          required: true
+          description: 正课第 N 天（1~5）
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+      responses:
+        '200':
+          description: 正文已生成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseContent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 该天已发并归档，不可重新生成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                archived:
+                  value:
+                    error:
+                      code: INVALID_STATE
+                      message: D2 已发归档，不可重新生成
+                      hint: 已发正文仅支持查看与复制
+  /api/sessions/{id}/course/{day}/publish:
+    post:
+      tags: [sessions]
+      summary: 正课标已发（进度回写 n/5，5/5 触发收官提醒）
+      operationId: publishCourseDay
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 场次 ID
+          schema:
+            type: string
+        - name: day
+          in: path
+          required: true
+          description: 正课第 N 天（1~5）
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+      responses:
+        '200':
+          description: 已发并归档，进度即时回写
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [day, publishedCount, total, sessionProgress]
+                properties:
+                  day:
+                    $ref: '#/components/schemas/CourseDay'
+                  publishedCount:
+                    type: integer
+                    description: 已发天数（1~5）
+                  total:
+                    type: integer
+                    const: 5
+                  sessionProgress:
+                    type: string
+                    description: 场次进度文案，如「已发 4/5」
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 幂等重复发布 —— 该天已标已发
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                alreadyPublished:
+                  value:
+                    error:
+                      code: ALREADY_PUBLISHED
+                      message: 该天正课已标记已发
+                      hint: 已发天数不可重复标记
+  /api/sessions/{id}/course/{day}/photo:
+    post:
+      tags: [sessions]
+      summary: 上传正课配图（每天 0~3 张，挂到当天正文）
+      operationId: uploadCoursePhoto
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 场次 ID
+          schema:
+            type: string
+        - name: day
+          in: path
+          required: true
+          description: 正课第 N 天（1~5）
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 图片文件（jpg / png，单张不超过 10MB）
+      responses:
+        '200':
+          description: 配图已挂到当天正文
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [day, photos]
+                properties:
+                  day:
+                    type: integer
+                  photos:
+                    type: integer
+                    minimum: 1
+                    maximum: 3
+                    description: 更新后的配图数
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: 该天配图已满 3 张
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                photoLimit:
+                  value:
+                    error:
+                      code: VALIDATION_FAILED
+                      message: 该天配图已满 3 张
+                      hint: 每天最多 3 张配图
+  /api/dashboard:
+    get:
+      tags: [common]
+      summary: 总台看板（三模块聚合数据）
+      operationId: getDashboard
+      responses:
+        '200':
+          description: 当前项目看板
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/audit:
+    get:
+      tags: [common]
+      summary: 操作审计流水（淘汰 / 恢复 / 终审 / 标已发等关键动作留痕）
+      operationId: listAudit
+      parameters:
+        - name: module
+          in: query
+          description: 按模块筛选
+          schema:
+            enum:
+              - 公域台
+              - 朋友圈
+              - 公开课
+              - 系统
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: 审计分页列表
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, pageSize, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEntry'
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/cost-report:
+    get:
+      tags: [common]
+      summary: LLM 成本报表（按提示词 P-01 ~ P-08 维度归集）
+      operationId: getCostReport
+      parameters:
+        - name: period
+          in: query
+          description: 统计月份（YYYY-MM），缺省为当月
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+            examples:
+              - '2026-09'
+      responses:
+        '200':
+          description: 成本报表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: period 格式非法
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/health:
+    get:
+      tags: [common]
+      summary: 健康检查（免认证）
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: 服务健康状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: '登录接口签发的 JWT，请求头 Authorization: Bearer {token}'
+  responses:
+    Unauthorized:
+      description: 未认证或令牌失效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            tokenExpired:
+              value:
+                error:
+                  code: TOKEN_EXPIRED
+                  message: 登录已过期
+                  hint: 请重新登录获取新令牌
+    Forbidden:
+      description: 无权限（如访问其它项目下的资源）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            forbidden:
+              value:
+                error:
+                  code: FORBIDDEN
+                  message: 无权访问该资源
+                  hint: 资源不属于当前项目，请先切换项目上下文
+    NotFound:
+      description: 资源不存在或不属于当前项目
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            notFound:
+              value:
+                error:
+                  code: NOT_FOUND
+                  message: 资源不存在
+                  hint: 请检查资源 ID 与当前项目上下文
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, hint]
+          properties:
+            code:
+              type: string
+              description: 错误码，如 UNAUTHORIZED / TOKEN_EXPIRED / FORBIDDEN / NOT_FOUND / ALREADY_PUBLISHED / INVALID_STATE / RESTORE_EXPIRED / VALIDATION_FAILED / SCHEDULE_CONFLICT
+            message:
+              type: string
+              description: 面向用户的一句话错误说明
+            hint:
+              type: string
+              description: 下一步指引（toast 文案直接可用）
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 2
+          maxLength: 32
+        password:
+          type: string
+          minLength: 6
+          maxLength: 64
+          format: password
+    LoginResponse:
+      type: object
+      required: [token, tokenType, expiresAt, user]
+      properties:
+        token:
+          type: string
+          description: JWT 访问令牌
+        tokenType:
+          type: string
+          const: Bearer
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+    User:
+      type: object
+      required: [id, name, role, projectId, projectName]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          description: 显示名，如「泽宇」
+        role:
+          enum:
+            - 内容操盘手
+            - 管理员
+        projectId:
+          type: string
+        projectName:
+          type: string
+          description: 当前项目上下文，如「泽宇 · 高净值变现IP」
+    Project:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          description: 项目名，如「泽宇 · 高净值变现IP」「岑晴川 · 别墅设计」
+        createdAt:
+          type: string
+          format: date-time
+    Account:
+      type: object
+      required: [id, name, full, platform, track, fans, works, watching, lastScan, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          description: 脱敏展示名，如「透*糖」
+        full:
+          type: string
+          description: 完整账号名（仅当前项目内可见）
+        platform:
+          enum:
+            - 抖音
+            - 视频号
+            - 小红书
+        track:
+          type: string
+          description: 赛道，如「商业IP赛道」「创业服务」
+        fans:
+          type: integer
+          minimum: 0
+          description: 粉丝量
+        works:
+          type: integer
+          minimum: 0
+          description: 作品数
+        watching:
+          type: boolean
+          description: 是否开盯
+        scanning:
+          type: boolean
+          description: 是否扫描中（瞬态，刷新后复位）
+        lastScan:
+          type: string
+          description: 最近扫描的展示文案，如「6 小时前来过」「扫描中」「开盯后自动扫描」
+        lastScanAt:
+          type: string
+          format: date-time
+          description: 最近扫描完成时间
+        status:
+          enum:
+            - scanning
+            - idle
+            - paused
+          description: scanning=扫描中（瞬态）/ idle=开盯空闲 / paused=已暂停
+    AccountCreate:
+      type: object
+      required: [full, platform, track, fans, works]
+      properties:
+        full:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: 完整账号名，入库后自动生成脱敏展示名
+        platform:
+          enum:
+            - 抖音
+            - 视频号
+            - 小红书
+        track:
+          type: string
+          maxLength: 20
+          description: 赛道；缺省记「未分赛道」
+        fans:
+          type: integer
+          minimum: 0
+        works:
+          type: integer
+          minimum: 0
+    ScanResult:
+      type: object
+      required: [accountId, scanId, status, etaSeconds]
+      properties:
+        accountId:
+          type: string
+        scanId:
+          type: string
+        status:
+          type: string
+          const: scanning
+        etaSeconds:
+          type: integer
+          description: 预计完成秒数（首轮扫描 10 分钟内）
+          examples:
+            - 600
+        message:
+          type: string
+          description: 如「10 分钟内完成首轮扫描，新爆款直接进池」
+    Topic:
+      type: object
+      required: [id, srcTitle, srcLikes, srcTime, srcAcct, newTitle, status, rel]
+      properties:
+        id:
+          type: string
+        srcTitle:
+          type: string
+          description: 对标原内容标题
+        srcLikes:
+          type: integer
+          minimum: 0
+          description: 原内容点赞数
+        srcTime:
+          type: string
+          description: 发布时间展示文案，如「2 天前」
+        srcAcct:
+          type: string
+          description: 来源账号（脱敏名）
+        newTitle:
+          type: string
+          description: 换理念后的我方选题标题；已筛除时可为空串
+        status:
+          enum:
+            - 选题
+            - 已出稿
+            - 已淘汰
+            - 已筛除
+          description: 选题=池内待出稿 / 已出稿=终审通过 / 已淘汰=人工淘汰（保留 90 天可恢复）/ 已筛除=系统自动筛除（相关度低于阈值 40，留痕）
+        rel:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 理念相关度；低于 40 自动筛除不入池
+        note:
+          type: string
+          description: 筛除 / 淘汰原因留痕
+        discardedAt:
+          type: string
+          format: date-time
+          description: 淘汰时间
+        restorableUntil:
+          type: string
+          format: date-time
+          description: 可恢复截止时间（淘汰后 90 天）
+        draftId:
+          type: string
+          description: 关联初稿 ID（进入出稿流程后回填）
+    IdeaOption:
+      type: object
+      required: [tag, title, desc]
+      properties:
+        tag:
+          type: string
+          maxLength: 12
+          description: 方向标签，如「理念一 · 反内耗」
+        title:
+          type: string
+          minLength: 8
+          maxLength: 30
+          description: 换理念后的选题标题
+        desc:
+          type: string
+          minLength: 20
+          maxLength: 120
+          description: 说清借了原文什么（角度 / 结构 / 情绪）、换成我们的什么理念内核
+    FrameOption:
+      type: object
+      required: [tag, title, desc]
+      properties:
+        tag:
+          type: string
+          maxLength: 12
+          description: 框架标签，固定为「框架 A · 冲突递进」或「框架 B · 案例实证」
+        title:
+          type: string
+          description: 骨架链路，固定为「钩子 → 冲突 → 展开 → 收尾」或「案例开场 → 拆解 → 迁移 → 行动指令」
+        desc:
+          type: string
+          minLength: 30
+          maxLength: 150
+          description: 每一环在本选题下具体讲什么
+    Draft:
+      type: object
+      required: [id, topicId, text, wordCount, likeness, status, createdAt]
+      properties:
+        id:
+          type: string
+        topicId:
+          type: string
+        idea:
+          $ref: '#/components/schemas/IdeaOption'
+        frame:
+          $ref: '#/components/schemas/FrameOption'
+        text:
+          type: string
+          minLength: 300
+          maxLength: 500
+          description: 口播初稿全文（纯文本，段间空行）
+        wordCount:
+          type: integer
+          minimum: 300
+          maximum: 500
+          description: 全文字数
+        likeness:
+          $ref: '#/components/schemas/Likeness'
+        status:
+          enum:
+            - 初稿
+            - 待终审
+            - 已打回
+            - 合规过审版
+          description: 初稿=生成或打回后编辑中 / 待终审=前两层已过 / 合规过审版=三层全过可交接剪辑
+        autoRewritten:
+          type: boolean
+          description: 是否因像你度低于 90% 触发过自动重生
+        sourceExcerpt:
+          type: string
+          description: 对标原文摘录（原创度检测的对照基准）
+        createdAt:
+          type: string
+          format: date-time
+    ComplianceHit:
+      type: object
+      required: [word, type, fix, count]
+      properties:
+        word:
+          type: string
+          description: 命中的风险词，如「最好」「稳赚」
+        type:
+          enum:
+            - 广告法极限词
+            - 承诺性表述
+        fix:
+          type: string
+          description: 修复建议，如「『最好』是极限词，改成『更适合大多数人』或删掉」
+        count:
+          type: integer
+          minimum: 1
+          description: 该词出现次数
+    RiskItem:
+      type: object
+      required: [span, suggestion]
+      properties:
+        span:
+          type: string
+          description: 原文中逐字连续出现的风险片段，供程序定位高亮与替换
+        suggestion:
+          type: string
+          description: 保持口吻的可直接替换改写
+        riskType:
+          enum:
+            - 承诺收益
+            - 制造焦虑
+            - 极限词变体
+            - 其他
+          description: 风险归类（第二层大模型复核输出）
+    Likeness:
+      type: number
+      minimum: 0
+      maximum: 100
+      multipleOf: 0.1
+      description: 像你度（0~100，保留 1 位小数）。低于 90 不出稿，由服务端自动重生一次后复检（NFR-17）
+      examples:
+        - 97.2
+    OverlapPct:
+      type: number
+      minimum: 0
+      maximum: 100
+      multipleOf: 0.1
+      description: 与对标原文连续 8 字重合率（%），保留 1 位小数；不超过 15 判定通过
+      examples:
+        - 9.8
+    Source:
+      type: object
+      required: [id, name, icon, status, desc]
+      properties:
+        id:
+          enum:
+            - voice
+            - case
+            - life
+            - cockpit
+            - audit
+          description: voice=声纹引擎 / case=案例库 / life=生活素材库 / cockpit=驾驶舱 / audit=审核记录
+        name:
+          type: string
+          description: 如「声纹引擎」「案例库」
+        icon:
+          type: string
+          description: 单字图标，如「声」「案」
+        status:
+          enum:
+            - ok
+            - scanning
+            - offline
+          description: ok=已就绪 / scanning=扫描中 / offline=未连通
+        desc:
+          type: string
+          description: 状态说明，如「干货口吻模型就绪 · 像你度 97.2%，灌入干货池」
+        likeness:
+          $ref: '#/components/schemas/Likeness'
+          description: 声纹引擎专属字段，当前模型像你度
+    PoolId:
+      enum:
+        - ganhuo
+        - anli
+        - shenghuo
+        - dianping
+        - chengjiao
+        - jushen
+      description: ganhuo=干货 / anli=案例 / shenghuo=生活 / dianping=点评 / chengjiao=成交 / jushen=拒审
+    Pool:
+      type: object
+      required: [id, name, count, cap, ratio, level]
+      properties:
+        id:
+          $ref: '#/components/schemas/PoolId'
+        name:
+          enum:
+            - 干货
+            - 案例
+            - 生活
+            - 点评
+            - 成交
+            - 拒审
+        count:
+          type: integer
+          minimum: 0
+          description: 当前库存条数（发布后同步扣减）
+        cap:
+          type: integer
+          minimum: 1
+          description: 池容量上限
+        ratio:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 取材配比（%），六池合计 100
+        level:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 水位（count / cap 四舍五入取整，%）；低于 20 触发见底提醒
+    Moment:
+      type: object
+      required: [id, poolId, text, wordCount, likeness, variantIndex, variantTotal, goldenUsed, published, createdAt]
+      properties:
+        id:
+          type: string
+        poolId:
+          $ref: '#/components/schemas/PoolId'
+        poolName:
+          enum:
+            - 干货
+            - 案例
+            - 生活
+            - 点评
+            - 成交
+            - 拒审
+        text:
+          type: string
+          minLength: 80
+          maxLength: 150
+          description: 朋友圈文案全文（纯文本，段间空行）
+        wordCount:
+          type: integer
+          minimum: 80
+          maximum: 150
+        likeness:
+          $ref: '#/components/schemas/Likeness'
+        variantIndex:
+          type: integer
+          minimum: 0
+          description: 当前变体下标（0 起）
+        variantTotal:
+          type: integer
+          minimum: 1
+          maximum: 3
+          description: 变体总数（每池 3 个变体循环）
+        goldenUsed:
+          type: boolean
+          description: 是否已植入金句（植入后计入「修改后发布」学习信号）
+        published:
+          type: boolean
+          description: 是否已标记已发（锁定，不可换不可重发）
+        photoSuggests:
+          type: array
+          items:
+            type: string
+          description: 配图推荐，生活池专属，如「#777 脱卷(办公室场景)」；其余池不返回
+        createdAt:
+          type: string
+          format: date-time
+    Session:
+      type: object
+      required: [id, title, host, warmStart, openDay, status, progress]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+          maxLength: 40
+          description: 课程主题（痛点人群 + 结果承诺）
+        host:
+          type: string
+          description: 主讲人，如「泽宇」
+        audience:
+          type: string
+          maxLength: 30
+          description: 目标人群
+        hook:
+          type: string
+          description: 主钩子文件名，如「高净值变现路线图」
+        warmStart:
+          type: string
+          format: date
+          description: 预热开始日
+        openDay:
+          type: string
+          format: date
+          description: 开课日（= 预热开始日 + 3 天）
+        status:
+          enum:
+            - 筹备中
+            - 预热中
+            - 正课中
+            - 已收官
+            - 已中止
+        progress:
+          type: string
+          description: 进度文案，如「预热 1/3」「已发 4/5」「筹备中」「已收官」
+        today:
+          type: string
+          description: 场次今日所处日，如「D1」（仅当前场返回）
+        current:
+          type: boolean
+          description: 是否当前操作场次
+    SessionCreate:
+      type: object
+      required: [title, audience, hook, warmStart]
+      properties:
+        title:
+          type: string
+          minLength: 4
+          maxLength: 40
+          description: 课程主题，格式为痛点人群 + 结果承诺
+        audience:
+          type: string
+          minLength: 2
+          maxLength: 30
+          description: 目标人群
+        hook:
+          type: string
+          description: 主钩子（从钩子文件库选择，如「高净值变现路线图」「报价 10 倍手册」）
+        warmStart:
+          type: string
+          format: date
+          description: 预热开始日；开课日自动 = 该日 + 3 天，正课期（开课日起 5 天）与在跑场次重叠时返回 422
+    WarmDay:
+      enum:
+        - D1
+        - D2
+        - D3
+      description: 预热日（开课前 3 天）
+    Channel:
+      enum:
+        - pyq
+        - dm
+        - poster
+      description: pyq=朋友圈文案 / dm=私信话术 / poster=宣传海报
+    PosterVariant:
+      type: object
+      required: [title, sub, proof, cta]
+      properties:
+        title:
+          type: string
+          maxLength: 20
+          description: 海报大标题，如「有流量, 却卡在变现」
+        sub:
+          type: string
+          maxLength: 30
+          description: 副标题，如「博主突破千万的私域成交系统课 · 5 天直播」
+        proof:
+          type: string
+          maxLength: 30
+          description: '数据背书，如「主讲: 泽宇 · 学员累计变现 2.3 亿」'
+        cta:
+          type: string
+          maxLength: 20
+          description: 行动指令条，如「扫码领取《高净值变现路线图》」
+    Material:
+      type: object
+      required: [sessionId, day, channel, name, variantIndex, variantTotal, published, variant]
+      properties:
+        sessionId:
+          type: string
+        day:
+          $ref: '#/components/schemas/WarmDay'
+        channel:
+          $ref: '#/components/schemas/Channel'
+        name:
+          type: string
+          description: 渠道中文名：朋友圈文案 / 私信话术 / 宣传海报
+        variantIndex:
+          type: integer
+          minimum: 0
+          description: 当前变体下标（0 起）
+        variantTotal:
+          type: integer
+          minimum: 1
+          maximum: 3
+        published:
+          type: boolean
+          description: 是否已标已发（锁定）
+        variant:
+          oneOf:
+            - type: string
+              description: pyq / dm 渠道文案全文；dm 文案含 {{称呼}} 占位符，发送前由前端按收信人替换
+            - $ref: '#/components/schemas/PosterVariant'
+          description: 当前变体内容，文案渠道为字符串，海报渠道为结构化四要素
+    CourseDay:
+      type: object
+      required: [day, theme, hook, status, photos]
+      properties:
+        day:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 正课第 N 天
+        theme:
+          type: string
+          description: 当天主题
+        hook:
+          type: string
+          description: 当天钩子文件名，如《报价 10 倍手册》
+        caseRef:
+          type: string
+          description: '参考案例（已核验），如「案例: 李笑来」；可为空'
+        status:
+          enum:
+            - 已发
+            - 未发
+        photos:
+          type: integer
+          minimum: 0
+          maximum: 3
+          description: 配图数（0~3）
+    CourseContent:
+      allOf:
+        - $ref: '#/components/schemas/CourseDay'
+        - type: object
+          required: [content, wordCount]
+          properties:
+            content:
+              type: string
+              minLength: 800
+              maxLength: 1200
+              description: 正课正文（纯文本，含行动指令与作业）
+            wordCount:
+              type: integer
+              minimum: 800
+              maximum: 1200
+    Dashboard:
+      type: object
+      required: [date, project, gongyu, quan, kaike]
+      properties:
+        date:
+          type: string
+          format: date
+        project:
+          $ref: '#/components/schemas/Project'
+        gongyu:
+          type: object
+          description: 公域台概览
+          required: [poolSize, byStatus, weeklyScan]
+          properties:
+            poolSize:
+              type: integer
+              description: 选题池条数（不含已筛除）
+            byStatus:
+              type: object
+              properties:
+                选题:
+                  type: integer
+                已出稿:
+                  type: integer
+                已淘汰:
+                  type: integer
+            weeklyScan:
+              type: object
+              required: [scanned, pooled, filtered]
+              properties:
+                scanned:
+                  type: integer
+                pooled:
+                  type: integer
+                filtered:
+                  type: integer
+                  description: 挂不上钩自动筛除（留痕）
+        quan:
+          type: object
+          description: 朋友圈概览
+          required: [todayPublished, signals, pools]
+          properties:
+            todayPublished:
+              type: integer
+              description: 今日已发条数
+            signals:
+              type: object
+              description: 本周学习信号
+              required: [swap, edit, publish]
+              properties:
+                swap:
+                  type: integer
+                  description: 换一换 · 次
+                edit:
+                  type: integer
+                  description: 修改后发布 · 次
+                publish:
+                  type: integer
+                  description: 标已发 · 条
+            pools:
+              type: array
+              items:
+                $ref: '#/components/schemas/Pool'
+        kaike:
+          type: object
+          description: 公开课概览
+          required: [byStatus, courseProgress]
+          properties:
+            byStatus:
+              type: object
+              properties:
+                筹备中:
+                  type: integer
+                预热中:
+                  type: integer
+                正课中:
+                  type: integer
+                已收官:
+                  type: integer
+                已中止:
+                  type: integer
+            currentSessionId:
+              type: string
+              description: 当前操作场次 ID（存在场次时返回）
+            courseProgress:
+              type: string
+              description: 当前场次正课进度，如「已发 4/5」
+        alerts:
+          type: array
+          items:
+            type: string
+          description: 提醒列表，如「干货池见底，只剩 4 条，今晚扫描后自动补料」
+    AuditEntry:
+      type: object
+      required: [id, at, module, actor, action, detail, result]
+      properties:
+        id:
+          type: string
+        at:
+          type: string
+          format: date-time
+        module:
+          enum:
+            - 公域台
+            - 朋友圈
+            - 公开课
+            - 系统
+        actor:
+          type: string
+          description: 操作人（定时任务记 scheduler）
+        action:
+          type: string
+          description: 动作，如 淘汰选题 / 恢复选题 / 采纳修复建议 / 终审通过 / 标已发 / 新建场次
+        targetType:
+          type: string
+          description: topic / draft / moment / session / material / courseDay / account
+        targetId:
+          type: string
+        detail:
+          type: string
+          description: 动作摘要
+        result:
+          enum:
+            - 成功
+            - 失败
+    CostReport:
+      type: object
+      required: [period, totalCalls, totalTokens, totalCostCny, byPrompt]
+      properties:
+        period:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+          description: 统计月份
+          examples:
+            - '2026-09'
+        totalCalls:
+          type: integer
+          description: llm-gateway 总调用次数
+        totalTokens:
+          type: integer
+          description: 总 token 消耗（输入 + 输出）
+        totalCostCny:
+          type: number
+          description: 总成本（元，人民币）
+        byPrompt:
+          type: array
+          description: 按提示词维度归集
+          items:
+            type: object
+            required: [promptId, name, calls, tokens, costCny]
+            properties:
+              promptId:
+                enum:
+                  - P-01
+                  - P-02
+                  - P-03
+                  - P-04
+                  - P-05
+                  - P-06
+                  - P-07
+                  - P-08
+              name:
+                type: string
+                description: 如「理念选题三选一」
+              calls:
+                type: integer
+              tokens:
+                type: integer
+              costCny:
+                type: number
+    Health:
+      type: object
+      required: [status, version, uptimeSeconds, services]
+      properties:
+        status:
+          enum:
+            - ok
+            - degraded
+        version:
+          type: string
+          description: 服务版本号
+        uptimeSeconds:
+          type: integer
+        services:
+          type: object
+          required: [db, llmGateway, scanner]
+          properties:
+            db:
+              $ref: '#/components/schemas/HealthItem'
+            llmGateway:
+              $ref: '#/components/schemas/HealthItem'
+              description: llm-gateway（加载 docs/prompts/P-01 ~ P-08）
+            scanner:
+              $ref: '#/components/schemas/HealthItem'
+              description: 对标扫描与五源连库扫描
+    HealthItem:
+      type: object
+      required: [status]
+      properties:
+        status:
+          enum:
+            - ok
+            - degraded
+            - down
+        latencyMs:
+          type: integer
